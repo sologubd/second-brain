@@ -1,10 +1,15 @@
 # Architecture reviews
 
-Three reviews across the twelve weeks, in two modes. Two are **self-inspection** —
-you review what you built. One works on a **deliberately bad system somebody else
-wrote**, because reviewing your own code only ever demonstrates that you can
-describe your own choices favourably, and finding a defect somebody else planted is
-the harder and more transferable skill.
+Three reviews, nominally at weeks 5, 8 and 12 — and each is a solid 3–4 hours, so
+each sits in its week's **Stretch**. That is a scheduling fact, not permission to
+skip them: **the value is in the comparison between them**, so what matters is that
+they happen in order and before the next one, not that they happen in a particular
+week. If review #1 slips to week 6, review #2 slips too. Write the month down.
+
+Two modes. Two are **self-inspection** — you review what you built. One works on a
+**deliberately bad system somebody else wrote**, because reviewing your own code
+only ever demonstrates that you can describe your own choices favourably, and
+finding a defect somebody else planted is the harder and more transferable skill.
 
 ## The four questions
 
@@ -84,7 +89,7 @@ shifted meaning under generated code, and where they have, the shift is stated.
 
 ## The three reviews
 
-### Review #1 — self, the platform so far · week 5
+### Review #1 — self, the platform so far · week 5 Stretch
 
 Write the checklist **first**, built around the four questions, and version it so a
 later review can be compared against this one. Then apply it to the platform as it
@@ -95,7 +100,7 @@ present or absent, with the evidence that decided it.
 names ≥3 classes with cited evidence rather than ticks; applying the checklist to
 the week's own diff produced ≥1 finding; 100% of findings name their class.
 
-### Review #2 — the supplied bad system · week 8
+### Review #2 — the supplied bad system · week 8 Stretch
 
 Review `SUP-01` (below) against all fourteen classes. **Do not read its
 planted-defect list until your review is written and committed.**
@@ -104,7 +109,7 @@ planted-defect list until your review is written and committed.**
 defects found before consulting the list; ≥2 findings supported by a
 **reproduction** rather than reading; 100% of identified defects cite a line range.
 
-### Review #3 — self, the full platform · week 12
+### Review #3 — self, the full platform · week 12 Stretch, or month 4
 
 Formalise the four questions into a **five-axis rubric** — correctness under
 repetition, crash-window durability, concurrency, contract and boundary assumptions,

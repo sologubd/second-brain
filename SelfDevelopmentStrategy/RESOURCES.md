@@ -11,9 +11,9 @@ and which week consumes it.
 **Your harness's CLI reference** — [Claude Code CLI](https://docs.claude.com/en/docs/claude-code/cli-reference) · [Codex](https://github.com/openai/codex)
 Non-interactive invocation, permission-mode flags, and the authentication
 boundary. Read the sections on print/headless mode, permission modes, and the
-compliance page's credential section. Subscription sign-in versus API key is a
-cost decision before it is an auth one, and the whole zero-marginal-cost premise
-rests on it. → **Week 1**, and again when you add a second harness.
+compliance page's credential section. Note where subscription sign-in parts from
+key-based access — it shapes the CLI-versus-SDK decision you make later, and is
+worth understanding before you need it. → **Week 1**, and again at weeks 7–9.
 
 **[Building Effective Agents](https://www.anthropic.com/engineering/building-effective-agents)** (Anthropic)
 The control-flow ownership distinction: workflows route the model through code
@@ -137,8 +137,8 @@ Named so the absence reads as a decision rather than an oversight.
 | Microservices decomposition | One service, one user. |
 | Hexagonal / Clean Architecture as doctrine | Its useful tenth is taught by Gateway and Adapter. |
 | TLA+ and formal methods | Genuinely well suited to verifying a state machine, but multi-week before it returns anything. On budget, not on merit. |
-| The Agent SDK instead of the CLI binary | Requires key-based billing and defeats the zero-marginal-cost premise. |
-| Chasing published quota numbers | Partly unpublished, partly temporary. Measure your own headroom in week 1. |
+| Adopting an SDK or direct API *before* the CLI subprocess path has run | Not a permanent verdict against them. The subprocess is the smallest thing that works, so it goes first; weeks 7–9 re-evaluate all three on requirements that have actually appeared. |
+| Reverse-engineering vendor quota behaviour | Unpublished, partly temporary, shared with your interactive use. Track tokens, cost and stalls; do not model the plan. This trains agent-system engineering, not subscription-plan archaeology. |
 | Memorising tracing attribute names | Actively churning. Read the spec at instrumentation time and pin the version. |
 | Numeric injection-defence percentages | No verified primary benchmark exists. Measure against your own system or say nothing. |
 | Enterprise process-prioritisation frameworks | Built for hundreds of processes. Context mismatch. |

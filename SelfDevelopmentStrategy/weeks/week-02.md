@@ -53,6 +53,8 @@ allowed to simply fail this week.
 
 ## Tasks
 
+### Core — required (~15h: 2h learning, 10h building/testing, 2.5h business)
+
 1. **Wire the verification gate.** Run the repo's test, lint and typecheck
    commands inside the worktree. Capture each one's output and exit code
    separately — a single pass/fail boolean throws away which gate failed and why.
@@ -62,14 +64,26 @@ allowed to simply fail this week.
 3. **Add the approval step.** Nothing reaches the Git host without an explicit
    approval that gets recorded. One approval per task, and a refusal is a valid
    outcome that gets logged.
-4. **Branch and PR.** Branch name derived from the task id. The task's file scope
-   is the expected diff scope; anything outside it is called out in the PR body.
+4. **Branch and PR.** Branch name derived from the task id. The task's declared
+   file list is the *expected* diff scope; anything outside it is called out in
+   the PR body as a difference to look at — not as a violation. A task can
+   legitimately need a file nobody predicted, and week 8 makes that distinction
+   properly.
 5. **Prove `main` is unreachable.** Write a test that fails if the pipeline can
    write to the default branch. Assert it, do not document it.
 6. **Business: send the first four cold messages.** Hand-written, one quoted
    public signal each, against the prospects from week 1. Open a send log with one
    row per touch. Shapes in
    [customer discovery](../business/customer-discovery.md).
+
+### Stretch — only after Core is DONE
+
+- **Add a second verification tier** the repo does not already have — a coverage
+  floor, a security linter, a formatter check — and see whether it ever catches
+  anything the existing three miss. If it does not, delete it and record that.
+- **Make the review payload diff-aware**: highlight the hunks that touch code
+  paths the task's assertions do not exercise. That intersection is where a
+  plausible-but-unverified change hides.
 
 ## Use it for real
 
@@ -83,7 +97,9 @@ in week 9 when a threshold depends on it.
 - Tasks run: 5. Reaching a valid PR: target ≥4.
 - Verification ran on 5 of 5. This is binary and non-negotiable.
 - PR acceptance: PRs you would actually merge, over PRs opened.
-- Unrelated changes: files touched outside the task's declared scope, per task.
+- Differences from declared scope: files touched that the task did not list, per
+  task — and how many of those the task genuinely needed. Only the second number
+  is a defect.
 - Interventions per task, and what each was.
 
 ## Failure exercise
@@ -117,8 +133,8 @@ agent curing instability by asserting less.
       the declared-versus-actual file scope.
 - [ ] Branch-and-PR path from a task id, with the approval recorded.
 - [ ] Test proving the pipeline cannot write to the default branch.
-- [ ] Run log for 5 tasks: PR opened or not, gate results, interventions,
-      out-of-scope files.
+- [ ] Run log for 5 tasks: PR opened or not, gate results, interventions, files
+      touched outside the declared list and whether each was legitimate.
 - [ ] Flaky-test report, five parts, with its proving test red on the parent
       commit.
 - [ ] Send log with 4 hand-written first touches, one public signal cited each.

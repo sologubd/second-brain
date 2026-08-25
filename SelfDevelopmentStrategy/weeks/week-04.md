@@ -64,6 +64,8 @@ the report, and the fix commit is the ground truth you score against.
 
 ## Tasks
 
+### Core — required (~15h: 2h learning, 10h building/testing, 3h business)
+
 1. **Assemble a labelled corpus.** At least 5 historical bugs where the correct
    root cause and the actual fix are known. Record, per bug: the report, the real
    root cause, the fixing commit, and the file the fix touched. This is your
@@ -86,6 +88,17 @@ the report, and the fix commit is the ground truth you score against.
    without a script reaches for a pitch, and pitching is how a live prospect
    becomes a courteous no. Script in
    [customer discovery](../business/customer-discovery.md).
+
+### Stretch — only after Core is DONE
+
+- **Connect a real error tracker** and run the lane from live event data rather
+  than from commit history. Richer material, and a real integration — but it adds
+  an API surface, and the learning objective is satisfied by historical bugs.
+- **Extend the corpus to 10 bugs** and see whether the correlation and root-cause
+  rates hold. Five is enough to find out whether the lane works; ten starts to be
+  enough to trust the number.
+- **Measure the reproduction gate's cost**: how many bugs did it slow down without
+  changing the diagnosis? A gate that never changes an outcome is overhead.
 
 ## Use it for real
 

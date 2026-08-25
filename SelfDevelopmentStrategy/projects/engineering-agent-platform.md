@@ -15,28 +15,50 @@ what and why. Reorder it freely on evidence.
 
 ## Ground rules
 
-**Shell out to the CLI binary; do not import the SDK.** Run the harness as a
-subprocess in non-interactive print mode. A print-mode session reuses whatever
-login is already present, including subscription OAuth; the SDK path requires a
-key-based credential and moves you onto metered billing, which destroys the
-zero-marginal-cost premise the whole year rests on. Signing in to an unmodified
-binary with your own subscription is the sanctioned pattern; building a product
-on the SDK is where the API key is expected.
+**Weeks 1–4: shell out to the CLI binary.** Run the harness as a subprocess in
+non-interactive print mode. The reason is simplicity and fast feedback — a
+subprocess boundary is the smallest thing that works, it has no library surface
+to learn, and it reuses whatever login is already present. Secondary benefit: it
+keeps early experimentation off metered billing while you are running a lot of
+throwaway tasks.
 
-*A live risk, stated rather than hidden:* advertised limits assume ordinary
-individual usage, and unattended orchestration is not that in spirit even on the
-same binary and login. Nothing published bans it — the explicit prohibitions
-target reselling or intermediating subscription credentials for other people's
-traffic — but the term is undefined and enforceable at the vendor's discretion.
-Practical rule: do not schedule so many concurrent unattended runs that the
-account stops resembling one developer's session pattern. Re-check the primary
-terms page before you commit to a second harness.
+**Later: choose deliberately.** The CLI is the right *first* execution path, not
+a permanent architectural commitment. Somewhere around weeks 7–9 — when tracing,
+structured tool calls and cancellation start mattering — re-evaluate CLI against
+SDK against direct API on the requirements that have actually appeared:
 
-**Quota binds; money does not.** What is scarce is agent re-execution, not euros.
-Measure your own headroom in week 1 rather than trusting published figures, which
-are partly unpublished and partly temporary — and remember the bucket is shared
-with your interactive use on the same account, so a measurement taken alongside
-ordinary chat measures the wrong thing.
+| Requirement | Why it may force the decision |
+|---|---|
+| Event streaming | Parsing a subprocess's output stream versus receiving typed events |
+| Structured tool calls | Whether you can define and dispatch tools without reparsing text |
+| Cancellation | Killing a subprocess is coarse; a client may cancel a turn cleanly |
+| Telemetry | Whether spans and token usage arrive as data or must be scraped |
+| Credentials | Interactive-session credentials versus a credential a service can hold |
+| Model routing | Switching models per step without respawning a process |
+| Production isolation | What a deployed service needs versus what a laptop needs |
+| Cost | Metered per-token versus flat-rate, at your actual volume |
+
+**Moving to the SDK or the API later is a deliberate architecture decision, not a
+failure of the original design.** Write it up as an ADR when you make it, with
+the requirement that forced it. Durable learning outranks current vendor pricing:
+the pricing will change, and the reasoning about execution boundaries will not.
+
+*One compliance note, stated rather than hidden:* consumer subscription terms
+assume ordinary individual usage, and heavy unattended orchestration is not
+obviously that. Practical rule: do not schedule so many concurrent unattended
+runs that the account stops resembling one developer's session pattern. If the
+volume you want exceeds that, it is a signal to move to a metered path — which is
+the deliberate decision above, arriving from a different direction.
+
+**Track cost, do not reverse-engineer the plan.** Record tokens per task,
+approximate cost per task, wall clock, and note when a run stalls on rate
+limiting. That is enough to make architecture decisions with. **Do not build a
+model of the vendor's quota system** — it is unpublished, partly temporary, and
+shared with your interactive use, so any number you derive is stale before it is
+useful. The roadmap trains agent-system engineering, not subscription-plan
+archaeology. The one architecturally relevant fact is coarse: *roughly how many
+runs can I get in an evening?*, which tells you whether to build for concurrency
+or for patience.
 
 **Do not name your package `platform`.** It shadows a Python standard-library
 module for every process started in that directory, and the failure does not
@@ -92,7 +114,7 @@ main checkout untouched, with allowed tools and permission mode taken from the
 policy file and no interactive prompt reachable at any point.
 **Done.** 5 real tasks run, ≥3 complete with no human writing code.
 **Metrics.** Tokens and wall clock per run; rate-limit stall seconds; interventions
-per task; measured weekly run headroom (labelled `floor` if nothing stalled).
+per task; a coarse sense of how many runs fit in an evening.
 **Failure modes discovered.** _(fill this in)_
 
 ### 2. Task → verified PR · week 2
@@ -143,12 +165,21 @@ correlation precision@k.
 
 **Why.** A long run died and you had to start over.
 **Build.** State enum plus transition table as data in Postgres; completion
-recorded in the same transaction as the effect; resume from the durable pointer,
-stopping where pointer and world disagree.
-**Demo counts when.** A killed run resumes from its last recorded step, and the
-kill sweep covers every boundary rather than a sample.
-**Done.** 100% of boundaries killed, all landing at the undisturbed terminal state.
-**Metrics.** Kill points passing; effects occurring twice; kill-to-resume distance.
+recorded in the same transaction as the **internal** effects it produced; resume
+from the durable pointer, stopping where pointer and world disagree; a detector
+that logs every such disagreement.
+**Scope precisely.** Only effects inside your own transactional system can share
+that transaction. Creating a PR, updating a tracker, sending mail — none of these
+can participate in a Postgres transaction, and no ordering makes them atomic with
+it. **External-effect atomicity is not solved here**; the crash window is a
+documented failure surface, and the disagreement log is what earns the outbox in
+capability 11.
+**Demo counts when.** A killed run resumes from its last recorded step for internal
+state, and the kill sweep covers every boundary rather than a sample.
+**Done.** 100% of boundaries killed, all landing at the undisturbed **internal**
+terminal state; the external-effect disagreement log exists and is non-empty.
+**Metrics.** Kill points passing; external-effect disagreements by kill point;
+kill-to-resume distance.
 **Failure modes discovered.** _(fill this in)_
 
 ### 6. Idempotency and retries · week 6
@@ -158,15 +189,21 @@ opened a PR, you now have two.
 **Build.** Naive handler **first**, with its duplicates counted. Then dedup table
 under a unique constraint, its row committed in the transition's transaction;
 three-verdict failure classification (retryable / permanent / already-applied); one
-retry budget shared across every layer.
+retry budget shared across every layer. Then a table classifying every **external**
+effect by the idempotency mechanism the provider actually offers — key, natural
+unique key, query-before-create, or none — with the remaining crash window stated
+per row.
 **Demo counts when.** 100 replays with injected kills yield exactly one state
-transition, one PR and one dedup row per key.
+transition and one dedup row per key, and every external effect is asserted only
+to what its mechanism actually guarantees.
 **Done.** ≥20 of 100 replays interrupted; the suite fails against the naive
-handler; 100% of naive-run duplicates classified.
-**Metrics.** Duplicate rate, naive and corrected, separately. Calls per failing
-task before and after the shared budget.
-**Claim carefully.** Effectively-once *processing* under at-least-once delivery.
-Never exactly-once.
+handler; every external effect appears in the table with a mechanism or an explicit
+**unresolved** marker.
+**Metrics.** Duplicate rate, naive and corrected, per effect. External effects with
+a working mechanism over external effects total — this will not be 1.
+**Claim carefully.** Effectively-once *processing* under at-least-once execution,
+**for the effects where a mechanism exists**. Never exactly-once, and never a
+guarantee a stub provided that the real API does not.
 **Failure modes discovered.** _(fill this in)_
 
 ### 7. Observability and cost accounting · week 7
@@ -191,48 +228,52 @@ hostile input, measured on a real run.
 **Why.** Serialising runs wastes your evening — and week 6 made duplicate
 execution safe, which is the precondition for running two of anything at once.
 **Build.** Queue as a **lease**, not a list: skip-locked claiming, expiry, orphan
-reclaim, dead-lettering with reasons, one worktree per worker. Declared file
-scopes, with partitioning before locking. Version column and rebuild-on-conflict
-where separation is unavailable. Middleware chain (retry, timeout, limiting) with
-its ordering justified.
+reclaim, dead-lettering with reasons, one worktree per worker. Declared file scope
+used as a **scheduler hint** for predicting collisions; the **actual changed-file
+set** inspected after every run as the only truth. Re-verification when the merge
+base moved. Version column and rebuild-on-conflict for real overlaps.
 **Demo counts when.** N workers with ≥30% killed mid-task strand nothing and
-duplicate nothing, and the dead-letter path is exercised deliberately.
+duplicate nothing; the dead-letter path is exercised deliberately; and a collision
+visible only in the *actual* diffs is caught before merge, rebuilt and re-verified.
 **Done.** 100% of tasks reach a recorded terminal state; reclaim visible in
-telemetry.
-**Metrics.** Stranded and duplicated counts; lease-expiry-to-reclaim latency;
-**separation-versus-version-conflict ratio** — the honest measure of how well
-partitioning works.
+telemetry; nothing treats declared scope as proof of independence.
+**Metrics.** Stranded and duplicated counts; lease-expiry-to-reclaim latency; scope
+prediction accuracy (actual set inside declared, which will not be 100%); collisions
+the prediction missed.
 **Failure modes discovered.** _(fill this in)_
 
 ### 9. Evals and regression gates · week 9
 
 **Why.** Eight weeks of prompts tuned by feel, and no idea whether last Tuesday's
 edit helped.
-**Build.** 20 real tasks with known outcomes, frozen with a digest. Three tiers
-reported separately: deterministic assertions, rescore (cheap check first, judge
-only on disagreement), N=5 replay with environment reset. Threshold as a
-statistical bound against last-known-good, with a written re-baselining condition.
-**Demo counts when.** Three tiers report separately, the pass-rate bound is stated,
-and a real change is blocked.
-**Done.** Each tier's blind spot named in writing; judge agreement measured
-chance-corrected on a labelled subset.
-**Metrics.** Pass-rate distribution; blocks and whether each was correct.
+**Build.** ≥10 real tasks with known outcomes, frozen with a digest. Two tiers
+reported separately: deterministic assertions, and N=5 replay with environment
+reset. Baseline recorded, candidate compared on the identical suite. Threshold as a
+bound against last-known-good, with a written re-baselining condition. A rescore
+tier — cheap check first, model judge only on disagreement — is a later refinement,
+and a judge you have not calibrated is a number you cannot use.
+**Demo counts when.** Tiers report separately, the pass-rate bound is stated, and a
+**real regression is caught**.
+**Done.** Baseline recorded and candidate compared on the identical frozen suite;
+each tier's blind spot named in one line.
+**Metrics.** Pass-rate distribution; regressions caught and whether each was real.
 **Failure modes discovered.** _(fill this in)_
 
 ### 10. Security boundaries · weeks 11–12
 
 **Why.** The system now holds private data, reads text strangers wrote, and can
 reach the network.
-**Build.** Provenance at ingest, trust-tiered retrieval, hard operator/document
-separator, output validation, and the structural rule that a turn touching
-untrusted input cannot invoke an external-send tool. Then per-tool
-least-privilege profiles, task-scoped short-lived credentials, per-action
-re-authorization, a sandbox with no network egress, and an append-only audit log
-with provenance.
-**Demo counts when.** An untrusted-input turn is refused an external-send tool,
+**Build.** Provenance at ingest, trust tiers and an operator/document delimiter —
+defense in depth. Then the controls: code outside the model that removes the
+external-send tool from any turn that consumed untrusted input; per-tool
+least-privilege profiles enforced at the call site; per-action re-authorization
+against a stored approval record; a sandbox with no network egress; an append-only
+audit log with provenance.
+**Demo counts when.** An untrusted-input turn cannot reach an external-send tool,
 and an out-of-profile call is refused *and appears in the audit log*.
-**Done.** The refusal is proved to come from code by an assertion that fails when
-the boundary is disabled.
+**Done.** Every refusal is proved to come from code by an assertion that fails when
+the control is disabled. **separator ≠ security boundary; model refusal ≠ security
+guarantee.**
 **Metrics.** Attack success rate per technique, per arm, with denominators.
 Latency added by re-authorization.
 **Failure modes discovered.** _(fill this in)_
@@ -240,7 +281,9 @@ Latency added by re-authorization.
 ### 11. External-effect durability · months 4–6
 
 **Why.** `db.commit(); host.create_pr()` has a crash window, and no test that does
-not kill the process between those two statements will ever find it.
+not kill the process between those two statements will ever find it. You have had
+the evidence since week 5's disagreement log and week 6's unresolved rows; this is
+where they get closed.
 **Build.** Outbox row written in the transition's transaction; a **separate relay
 process** delivering at least once; handlers correct under double delivery. Then
 teardown as a saga, with permanent failures injected into the compensations

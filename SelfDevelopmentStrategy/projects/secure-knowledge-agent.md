@@ -44,17 +44,25 @@ demonstrably better once the post-filter failure has been reproduced.
 **Done.** A 15–20 pair labelled query set exists, frozen with a digest **before any
 tuning**. Lexical, vector and hybrid each measured against it separately.
 
-**Metrics.** NDCG@5, MRR, precision@5 per configuration. Authorized results
-returned when k exist, pre-filter versus post-filter — the gap is the finding.
+**Metrics.** NDCG@5 and MRR per configuration — lexical, vector, hybrid, reported
+separately. Authorized results returned when k exist, pre-filter versus post-filter
+— the gap is the finding.
 
-### 2. Chunking, reranking, metadata filters, cited answers · week 10
+Everything past this — reranking, chunking sweeps, citation enforcement, metadata
+experiments — is capability 2 and it is Stretch. The proof week 10 owes is the
+comparison against a frozen set plus the reproduced authorization failure. A
+half-finished system with five techniques in it is worth less than three honest
+numbers.
+
+### 2. Chunking, reranking, metadata filters, cited answers · week 10 *(Stretch)*
 
 **Why.** Retrieval tuned by feel degrades invisibly; retrieval tuned against a
 frozen set is a diffable experiment.
 
-**Build.** Chunking sweep against the frozen set. CPU cross-encoder reranker.
-Metadata filters. A cited-answer schema that rejects an answer whose citation is
-absent from the retrieved context.
+**Build.** In value order: a CPU cross-encoder reranker with its lift measured
+against the frozen set; a cited-answer schema that rejects an answer whose citation
+is absent from the retrieved context; a chunking sweep; metadata filters. Take them
+one at a time and stop when the week runs out.
 
 **Demo counts when.** Metrics print per configuration against the frozen set, and a
 deliberately unfaithful answer is rejected.
@@ -67,14 +75,15 @@ CPU. Cost per answer in tokens.
 **Why.** Everything retrieved here crosses a trust boundary before it reaches a
 model. This project supplies the surface the security exercises attack.
 
-**Build.** Provenance tagging at ingest, trust-tiered retrieval, a hard separator
-between operator instructions and document content, output validation, and the
-structural rule that a turn touching untrusted content cannot reach an
-external-send tool.
+**Build.** Provenance tagging at ingest, trust-tiered retrieval and a delimiter
+between operator instructions and document content — all **defense in depth**,
+none of them a boundary. Then the actual control: code, outside the model, that
+removes the external-send tool from any turn that consumed untrusted content.
 
-**Demo counts when.** An untrusted-input turn is refused an external-send tool, and
-the refusal is proved to come from code by an assertion that fails when the boundary
-is disabled.
+**Demo counts when.** An untrusted-input turn cannot reach an external-send tool,
+and the refusal is proved to come from code by an assertion that fails when the
+control is disabled. A demo where the model merely declined has demonstrated
+today's model, not your system.
 
 **Metrics.** Attack success rate per technique, per arm, with denominators. Retrieval
 precision before and after — to show whether the boundary cost ordinary quality.

@@ -2,9 +2,10 @@
 
 ## Outcome
 
-By Sunday a prompt change or a harness change cannot merge without clearing three
-gates: deterministic assertions, a rescore, and a five-rerun replay against a
-pass-rate threshold you can defend in writing.
+By Sunday a prompt change or a harness change cannot merge without clearing a
+gate: deterministic assertions plus a five-rerun replay against a pass-rate
+threshold you can defend in writing — and the gate has caught at least one real
+regression.
 
 ## Why now?
 
@@ -19,32 +20,32 @@ deliberately placed after there is enough surface to regress.
 
 ## Build
 
-**A 20-task suite** drawn from real tasks you have already run — the feature and
+**A frozen suite** drawn from real tasks you have already run — the feature and
 bug tasks from weeks 3 and 4, with their known-correct outcomes. Real tasks with
-known answers, not synthesised ones.
+known answers, not synthesised ones. Twenty is a good size; ten real ones beat
+twenty padded ones.
 
-**Three gate tiers, reported as separate checks.** One aggregate verdict throws
-away which tier failed, and the tiers catch different things:
+**Tiers, reported as separate checks.** One aggregate verdict throws away which
+tier failed, and the tiers catch different things:
 
-| Tier | What it is | What it cannot catch |
-|---|---|---|
-| 1 — deterministic | Assertions: did the test pass, did the PR open, was the file scope respected | Anything about quality |
-| 2 — rescore | A cheap lexical/entailment check first; a model judge only where those disagree | Its own position bias |
-| 3 — replay | The full task run, N=5, with environment reset between runs | Anything the suite does not cover |
+| Tier | What it is | What it cannot catch | |
+|---|---|---|---|
+| **Deterministic** | Did the test pass, did the PR open, was the done-condition met | Anything about quality | **Core** |
+| **Repeated replay** | The full task run, N=5, environment reset between runs | Anything the suite does not cover | **Core** |
+| Rescore | A cheap lexical/entailment check first; a model judge only where those disagree | Its own position bias | *Stretch* |
 
-**Report each tier's blind spot in the artifact.** Most published eval work asserts
-a score; asserting a decision rule *and its blind spots* is what an engineer who
-has run a flaky suite looks for.
+The first two are enough to build a working regression gate. The third improves
+what it can see and is where most of the complexity lives.
 
-**A threshold stated as a statistical bound, not a binary.** With N=5 per task,
-you have a pass-rate distribution, and "everything must pass" is not a threshold —
-it is a wish. State the bound against last-known-good, justify it in writing, and
+**A threshold stated as a bound, not a binary.** With N=5 per task you have a
+pass-rate distribution, and "everything must pass" is not a threshold — it is a
+wish. State the bound against last-known-good, justify it in a paragraph, and
 state the condition under which you re-baseline.
 
-**On the judge tier:** reproducibility is not validity. A judge can show very high
-test-retest reliability and substantial position bias at the same time, and raw
-agreement overstates chance-corrected agreement. Use it as the tie-breaker, not
-the primary instrument, and record its agreement with your own labels on a subset.
+**If you build the judge tier, calibrate it.** Reproducibility is not validity: a
+judge can show very high test-retest reliability and substantial position bias at
+the same time, and raw agreement overstates chance-corrected agreement. Use it as
+a tie-breaker, never the primary instrument.
 
 ## Learn
 
@@ -57,25 +58,51 @@ the primary instrument, and record its agreement with your own labels on a subse
 
 ## Tasks
 
-1. **Assemble the 20-task suite** from real historical tasks, each with its
-   known-correct outcome. Freeze it, and record a digest so a later reader can
-   prove it was frozen before tuning.
-2. **Build tier 1**: deterministic assertions per task.
-3. **Build tier 2**: cheap lexical/entailment check, with the judge invoked only
-   on disagreement. Measure the judge's agreement with your own labels on a
-   subset, and report chance-corrected agreement rather than raw.
-4. **Build tier 3**: N=5 replay with environment reset between runs, reporting a
-   pass-rate distribution.
-5. **Set and justify the threshold.** A statistical bound against last-known-good,
-   plus the re-baselining condition, written out.
-6. **Wire the gate into the merge path** for changes to prompts, tool definitions
-   and harness code — and demonstrate it blocking a change.
-7. **Run a trace-evaluation pass** over the week-7 spans: sample completed runs
-   and check the claimed reasoning against what the trace shows actually happened.
-8. **Business: 5 sends, and compute your funnel rates.** You now have roughly
+### Core — required (~15h: 2h learning, 10h building/testing, 3h business)
+
+1. **Assemble the frozen suite** from real historical tasks, each with its
+   known-correct outcome. Record a digest so a later reader can prove it was
+   frozen before tuning. **Twenty tasks if you have twenty; ten is enough to start
+   and honest about it** — a suite of ten real tasks beats twenty where half were
+   invented to fill the count.
+2. **Deterministic checks.** Per task: did the test pass, did the PR open, was the
+   done-condition met. Binary, cheap, no model involved. This tier does most of
+   the work and it is the one you must not skip.
+3. **Repeated execution.** Run each task N=5 with the environment reset between
+   runs, and report a **pass-rate distribution** rather than a single figure. The
+   pipeline is nondeterministic, so one green run and one red run are both
+   uninformative.
+4. **Baseline versus candidate.** Record the current pass rates as
+   last-known-good. Then make a real change — edit the plan prompt, swap the model
+   — and compare candidate against baseline on the same frozen suite.
+5. **State the threshold explicitly**, as a bound against last-known-good rather
+   than "everything must pass", with a one-paragraph justification and the
+   condition under which you re-baseline.
+6. **Wire the gate into the merge path** for prompt, tool-definition and harness
+   changes — and **catch one real regression with it.** That is the week's proof.
+   If the gate never blocks anything, you have not tested the gate.
+7. **Business: 5 sends, and compute your funnel rates.** You now have roughly
    50 sends of history. Divide. Reply rate, reply-to-call rate, actual numbers
    with denominators visible. This is the first week that division means anything;
    record what it says even if what it says is zero.
+
+### Stretch — only after Core is DONE
+
+- **Add the rescore tier**: a cheap lexical or entailment check on output quality,
+  with a model judge invoked *only* where the cheap checks disagree. Genuinely
+  useful, and it is where most of the week's complexity lives — which is why it is
+  not required to claim a working regression gate.
+- **Calibrate the judge** if you built it: measure its agreement with your own
+  labels on a labelled subset and report **chance-corrected** agreement rather than
+  raw, because raw agreement overstates it. Also check position bias by swapping
+  the order of the things being compared. A judge you have not calibrated is a
+  number you cannot use.
+- **Trace evaluation**: sample completed runs from the week-7 spans and check the
+  claimed reasoning against what the trace shows actually happened. Excellent
+  exercise, entirely separable from the gate.
+- **Write each tier's blind spot** in one line. Cheap, and it is what separates
+  asserting a score from asserting a decision rule — do this one even if you skip
+  the rest.
 
 ## Use it for real
 
@@ -87,9 +114,10 @@ the gate.
 ## Measure
 
 - Suite pass-rate distribution over N=5, per task and aggregate.
+- Baseline versus candidate on the same frozen suite, per task.
 - Threshold: the stated bound, and the current position relative to it.
-- Judge agreement with your labels on the subset, chance-corrected.
-- Gate blocks: at least one real change blocked, and whether the block was right.
+- Gate blocks: **at least one real regression caught**, and whether the block was
+  right. This is the week's headline.
 - Business: actual reply rate and reply-to-call rate, denominators shown.
 
 ## Failure exercise
@@ -110,36 +138,36 @@ cannot both hold — and score an elegant implementation of one as a failure.
 - **Logging.** Both criteria, whether the agent raised or chose, and which it
   chose. That distribution alone is informative: agents take the first, the
   longest, or the last, and knowing which tells you how to write tasks.
-- **Proving test.** Plant contradictions inside the 20-task suite. Raising rate
+- **Proving test.** Plant contradictions inside the frozen suite. Raising rate
   must beat a threshold declared in advance, and a quiet choice scores as a
   failure whatever its output quality. **Remove the restatement step and the rate
   collapses.**
 
 ## Deliverables
 
-- [ ] Frozen 20-task suite from real tasks, with a digest proving the freeze.
-- [ ] Three gate tiers running and reporting as separate checks.
-- [ ] Written threshold: statistical bound, justification, re-baselining condition.
-- [ ] Each tier's blind spot stated in writing.
-- [ ] Judge agreement measured on a labelled subset, chance-corrected.
-- [ ] Gate wired into the merge path, with one real change demonstrably blocked.
-- [ ] Trace-evaluation report over the week-7 spans.
+- [ ] Frozen suite of ≥10 real tasks, with a digest proving the freeze.
+- [ ] Deterministic tier and N=5 replay tier, reporting as separate checks.
+- [ ] Baseline-versus-candidate comparison on the same frozen suite.
+- [ ] Written threshold: bound against last-known-good, justification,
+      re-baselining condition.
+- [ ] Gate wired into the merge path, with **one real regression caught**.
 - [ ] Conflicting-requirements report, five parts, proving test red without the
       restatement step.
 - [ ] 5 sends logged; funnel rates computed from actuals with denominators.
 
 ## Done when
 
-- [ ] Three tiers run as separate checks and report separately.
-- [ ] Tier 3 runs N=5 per task with environment reset, and reports a pass-rate
-      distribution rather than a single figure.
-- [ ] The threshold is stated as a bound with a written justification and a
-      re-baselining condition.
-- [ ] Each tier's blind spot is named in the artifact.
-- [ ] At least one real change was blocked by the gate, and you can say whether
-      the block was correct.
-- [ ] Raising rate on planted contradictions beats the pre-declared threshold over
-      20 tasks, and 100% of quiet choices score as failures.
+- [ ] The suite is frozen with a digest, and every task in it is a real task with
+      a known-correct outcome.
+- [ ] Tiers run and report separately; the replay tier runs N=5 with environment
+      reset and reports a distribution rather than a single figure.
+- [ ] Candidate is compared against a recorded baseline on the identical suite.
+- [ ] The threshold is a stated bound with a written justification and a
+      re-baselining condition — not "everything must pass".
+- [ ] **At least one real regression was caught by the gate**, and you can say
+      whether the block was correct.
+- [ ] Raising rate on planted contradictions beats the pre-declared threshold, and
+      100% of quiet choices score as failures.
 - [ ] The scoreboard's rate rows are computed from actuals, with denominators
       visible.
 
@@ -149,17 +177,16 @@ cannot both hold — and score an elegant implementation of one as a failure.
    longest, the last? Is that stable across the suite?
 2. What does the raising rate tell you about your task-writing that a pass rate
    cannot?
-3. Which tier would you drop if you had to run this gate ten times a day, and what
-   would you stop being able to see?
+3. The regression you caught: would a human reviewer have caught it? If yes, what
+   did the gate buy you — speed, or the fact that a human would not have looked?
 
 ## Evidence
 
 - Frozen suite and its digest.
 - Per-tier gate output and the pass-rate distribution.
+- Baseline and candidate results side by side.
 - Threshold document with justification.
-- Judge agreement figures.
-- The blocked change.
-- Trace-evaluation report.
+- The caught regression, and the gate output that caught it.
 - Conflicting-requirements report and its red-on-parent test.
 - Send log and the computed rates.
 

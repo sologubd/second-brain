@@ -33,10 +33,11 @@ provider-reported usage within rounding — if they do not, your accounting is
 fiction. Report tokens as the primary unit; a euro figure at a declared imputed
 rate is useful context, not the measurement, while you are on a flat-rate plan.
 
-**Rate limiting and a bounded budget.** A token bucket *above* the retry layer —
-a limiter below the retry cannot bound anything. And an aggregate spend budget
-per task that is checked **before each unit of work**, not sampled on a timer.
-Then induce a failure storm and prove the budget holds.
+**A bounded budget.** An aggregate spend budget per task, checked **before each
+unit of work**, not sampled on a timer. Then induce a failure storm and prove the
+budget holds. A token bucket for rate shaping is Stretch — placement matters when
+you build it (*above* the retry layer; a limiter below the retry cannot bound
+anything), but the budget is what stops runaway spend.
 
 Pin the semantic-convention version you instrument against, and record it in the
 run metadata. The conventions churn; a trace whose attribute names you cannot date
@@ -58,20 +59,35 @@ is a trace you cannot compare next quarter.
 
 ## Tasks
 
+### Core — required (~15h: 2.5h learning, 9.5h building/testing, 3h business)
+
 1. **Instrument the pipeline.** Spans for run, step, model call and tool call,
    correctly nested, against a pinned convention version.
 2. **Reconcile token counts** against provider-reported usage. Assert the match
    within rounding, in a test.
 3. **Add `stall_seconds`** as a first-class span attribute, and make the metrics
    that depend on duration exclude stalled samples.
-4. **Build the token bucket above the retry layer**, and a test proving the
-   ordering — a limiter placed below the retry fails it.
-5. **Add the aggregate per-task spend budget**, checked before each unit of work,
+4. **Add the aggregate per-task spend budget**, checked before each unit of work,
    and prove under an induced failure storm that it bounds total spend.
-6. **Run the cost-exhaustion attack.** This is the failure exercise: measure the
+5. **Run the cost-exhaustion attack.** This is the failure exercise: measure the
    undefended spend first, on a real run.
-7. **Business: 8 sends, and workflow document #2.** Second workflow documented end
+6. **Business: 8 sends, and workflow document #2.** Second workflow documented end
    to end, tagged `real` or `simulated`.
+
+### Stretch — only after Core is DONE
+
+- **Add the token bucket above the retry layer**, with a test proving the ordering
+  (a limiter placed below the retry fails it). The aggregate spend budget in Core
+  is what actually stops the bleeding; rate shaping is refinement.
+- **Reconcile `stall_seconds` across a week of runs** and see whether excluding
+  stalled samples changes any conclusion you had drawn. If it changes nothing at
+  your volume, say so and stop excluding.
+- **Now do the CLI-versus-SDK evaluation.** You have just discovered what
+  telemetry, cancellation and structured tool calls actually cost you through a
+  subprocess. Write it up as an ADR against the requirements table in
+  [the platform file](../projects/engineering-agent-platform.md#ground-rules).
+  Deciding to stay on the CLI is a valid outcome — but decide it, do not default
+  into it.
 
 ## Use it for real
 
@@ -120,7 +136,6 @@ before it spends, and put a real number on the undefended cost.
       a test.
 - [ ] `stall_seconds` per span, and duration-dependent metrics excluding stalled
       samples.
-- [ ] Token bucket above the retry layer, with an ordering test.
 - [ ] Aggregate spend budget proved to bound spend under an induced failure storm.
 - [ ] Cost-exhaustion report, five parts, carrying the measured undefended spend
       and the defended one.

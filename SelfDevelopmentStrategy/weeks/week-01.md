@@ -30,9 +30,12 @@ tests
 ```
 
 One module. A task file in, a diff and a test result out. Details — the task-file
-shape, why you shell out to the CLI binary rather than importing an SDK, which
+shape, why the CLI subprocess is the right *first* execution path, which
 repository to point it at — are in
-[the platform file](../projects/engineering-agent-platform.md), capability 1.
+[the platform file](../projects/engineering-agent-platform.md), capability 1. The
+subprocess is chosen for simplicity, not forever: whether to stay on it or move
+to an SDK or the API is a deliberate decision you make around weeks 7–9, against
+requirements that have actually appeared.
 
 **Do not build yet:** a multi-harness abstraction, a durable state machine, a task
 queue, concurrency, a quota model, a plugin architecture, a provider abstraction.
@@ -43,8 +46,9 @@ practising speculative generality.
 ## Learn
 
 - Your harness's CLI reference: non-interactive invocation, permission modes,
-  and where subscription sign-in parts from key-based access. That last boundary
-  is a cost decision before it is an auth one.
+  and where subscription sign-in parts from key-based access. Worth understanding
+  now because it feeds the later CLI-versus-SDK decision — not because it settles
+  it.
 - [Building Effective Agents](https://www.anthropic.com/engineering/building-effective-agents).
   Short. The question it answers — who owns control flow — is the one you will
   answer per stage for the rest of the year.
@@ -52,6 +56,8 @@ practising speculative generality.
 That is it. Two items, ~2h.
 
 ## Tasks
+
+### Core — required (~15h: 2h learning, 9h building/testing, 3h business)
 
 1. **Build the runner.** Task file → worktree → unattended subprocess → captured
    diff. Use the worktree from the first attempt: your first unattended failure
@@ -74,6 +80,16 @@ That is it. Two items, ~2h.
    public sources only, no warm introductions. Checklist in
    [customer discovery](../business/customer-discovery.md).
 
+### Stretch — only after Core is DONE
+
+- **Put one task through a second harness** and record where the behavioural
+  difference actually surfaces — an exit code, a line on stderr, a JSON event.
+  Then answer: could your runner currently tell that apart from a genuine task
+  failure? This is reconnaissance for the adapter decision, not the adapter.
+- **A second pass on the specificity check**: find a task file that passes all
+  three checks and is *still* ambiguous, and write down what a fourth check would
+  have to look for.
+
 ## Use it for real
 
 Five tasks from a real repository — your own project, or a throwaway sandbox
@@ -87,9 +103,11 @@ invented to suit the runner.
 - Tasks run: 5. Completed with no human writing code: target ≥3.
 - Human interventions per task, and what each one was.
 - Wall clock and tokens per run. Record rate-limit stall time separately.
-- Roughly how many runs you get before the plan starts throttling you. Run a
-  contiguous batch on one pinned model and count the runs before the first stall.
-  If nothing stalls, record the count as a **floor** and do not extrapolate it.
+- Roughly how many runs fit in an evening before you start waiting. One coarse
+  number is enough — it tells you whether later weeks should build for
+  concurrency or for patience. **Do not try to reverse-engineer the vendor's
+  quota system**: it is unpublished, partly temporary, and shared with your
+  interactive use, so any model of it is stale before it is useful.
 
 ## Failure exercise
 
