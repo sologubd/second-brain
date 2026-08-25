@@ -1,0 +1,41 @@
+# FIXTURE (must fail): a minimal canon with two coverage holes.
+#
+#   1. BR-002 has no brief_requirement_coverage row, so a brief requirement is
+#      enumerated and then silently never mapped to anything.
+#   2. ROADMAP.md is assigned the schema `roadmap`, which no schema and no
+#      non_prose_file_class defines.
+#
+# Proves coverage-report actually diffs the two lists rather than returning
+# zero unmapped rows by construction — which is the failure mode the resources
+# schema was added to close.
+
+schemas:
+  non_prose_file_classes:
+    note: "Classes with no prose schema, satisfied by exclusion."
+    classes:
+      - {name: "canon", files: 1, validated_by: "YAML parse"}
+  README:
+    applies_to: "README.md"
+    sections_in_order: ["## Objective"]
+    section_count: 1
+    word_band: [10, 100]
+
+file_manifest:
+  total: 3
+  counts: {root: 2, canon: 1}
+  arithmetic: "2 + 1 = 3"
+  files:
+    - {path: "README.md", schema: "README", purpose: "Entry point."}
+    - {path: "ROADMAP.md", schema: "roadmap", purpose: "Typo: the schema is `ROADMAP`."}
+    - {path: "canon/canon.yaml", schema: "canon", purpose: "This file."}
+
+brief_requirements:
+  - {id: "BR-001", section: "Role", requirement: "Design an engineering programme, not a reading list.", kind: "constraint"}
+  - {id: "BR-002", section: "Role", requirement: "Every week names a runnable demo command.", kind: "constraint"}
+
+brief_requirement_coverage:
+  count: 2
+  build_process_requirements: []
+  build_process_note: "None in this fixture."
+  rows:
+    - {id: "BR-001", satisfied_by: ["file_manifest.files"]}

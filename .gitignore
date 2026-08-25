@@ -216,3 +216,13 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# ---------------------------------------------------------------------------
+# Programme-specific. The repository root sits one level above the programme,
+# so these guard what SelfDevelopmentStrategy/.gitignore cannot reach.
+# ---------------------------------------------------------------------------
+
+# OMC operational state — not program content
+.omc/
+
+.DS_Store

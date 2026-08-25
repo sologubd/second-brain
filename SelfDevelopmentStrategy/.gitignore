@@ -1,0 +1,12 @@
+# OMC operational state — not program content
+.omc/
+
+# Claude Code local state; skills and agents ARE tracked (Track A subject matter)
+.claude/settings.local.json
+.claude/state/
+
+# Real prospect data, client names, interview notes — never tracked
+*.local.md
+
+node_modules/
+.DS_Store
