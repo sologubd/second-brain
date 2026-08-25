@@ -26,27 +26,54 @@ Pipeline as the user sees it: documents → ingestion → chunk/index → hybrid
 retrieval → reranking → permission filtering → LLM → cited answer.
 
 **The build deliberately violates that order.** The diagram puts permission
-filtering after reranking; implemented that way it is a disclosure vulnerability,
-so authorization moves *ahead of the search*. The diagram describes the data a
-user sees. It is not an execution order, and treating it as one is the exact
-mistake this project exists to teach.
+filtering after reranking; implemented that way it is a disclosure vulnerability.
+The diagram describes the data a user sees. It is not an execution order, and
+treating it as one is the exact mistake this project exists to teach.
 
-**Filter before you search, not after.** This is the correctness and security crux
-of the whole project:
+**Authorization must constrain the searchable candidate universe.** That is the
+requirement. *How* you satisfy it is the engineering, and this is where the
+common shorthand is wrong.
 
-- *Correctness.* Post-filtering runs the approximate-nearest-neighbour search
-  first and then discards unauthorized hits from that k. An authorized but
-  lower-ranked chunk gets pushed out entirely, and the user receives fewer than k
+### What a `WHERE` clause does and does not buy you
+
+**A SQL `WHERE tenant_id = ...` beside a vector-index scan is not automatically
+pre-filtered ANN.** With a global HNSW or IVFFlat index, the planner may run the
+approximate scan over the whole index first and apply your predicate to the rows
+that come back. You wrote a filter that reads like a pre-filter and got
+post-filter behaviour, and nothing in the query text says so — you have to read
+the plan.
+
+The failure it produces is the same one post-filtering always produces:
+
+- *Correctness.* The ANN scan returns its top candidates from the **whole** index,
+  the predicate discards the unauthorized ones, and an authorized but
+  lower-ranked chunk is never considered at all. The user gets fewer than k
   results — sometimes zero — from a corpus that genuinely contained a good match.
-- *Security.* Worse: result count, latency and partial scores **leak the existence
-  of documents the user may not see**, even when no forbidden text is ever
-  returned.
-- *Why it matters here.* Ask an agent to add access control and it generates the
-  post-filter form by default, because that is the readable form. It compiles, it
-  passes a happy-path test, and it fails precisely when it matters. And a test
-  asserting only "no unauthorized content was returned" passes over both halves —
-  which is why your test asserts the **count**: exactly k authorized results
-  whenever k exist.
+- *Security.* Result count, latency and partial scores **leak the existence of
+  documents the user may not see**, even when no forbidden text is returned.
+- *Why it bites here.* Ask an agent to add access control and it emits exactly
+  this shape, because it is the readable one. It compiles, it passes a happy-path
+  test, and it fails precisely when it matters. A test asserting only "no
+  unauthorized content was returned" passes over both halves — which is why your
+  test asserts the **count**: exactly k authorized results whenever k exist.
+
+### The five approaches to compare
+
+There is no single correct answer, and finding out which one your data wants is
+the exercise. Run the same authorized queries through each and record recall
+against the frozen set, latency, and whether the guarantee is structural or
+best-effort.
+
+| Approach | How authorization constrains the candidates | Cost |
+|---|---|---|
+| **Global ANN + filter** | It does not, reliably — the predicate applies to what the scan already returned. The baseline you are measuring *against*. | Fast, and wrong at the tail |
+| **Iterative scan** | Keep scanning the ANN index and discarding until k authorized results are found, or the scan is exhausted. Correctness improves; the guarantee is still probabilistic and the cost is unbounded when the authorized subset is sparse. | Variable, sometimes badly |
+| **Exact search over the authorized subset** | Fully structural: fetch the authorized rows, then do exact nearest-neighbour over just those. Correct by construction. | Fine for small subsets, degrades with size |
+| **Partial indexes** | One index per authorized partition, so the scan cannot see outside it. Structural, and only workable when the partition set is small and stable. | Index proliferation |
+| **Tenant partitioning / separate tables** | Strongest separation: the unauthorized rows are not in the object being searched. | Operational overhead; wrong for fine-grained per-document ACLs |
+
+**Read the query plan for each.** The whole lesson is that the SQL text does not
+tell you which of these you got.
 
 **Lexical first, then embeddings.** BM25 before vectors, because it is cheap,
 deterministic, and its failure modes — synonymy, vocabulary mismatch — are exactly
@@ -62,8 +89,8 @@ normalising them separately, is unsound: the scales are incomparable and the res
 is silently dominated by whichever signal happens to have the wider numeric range
 that day.
 
-**Scope warning.** This week can absorb unlimited time. Core is the comparison and
-the authorization failure; reranking, chunking sweeps, citation enforcement and
+**Scope warning.** This week can absorb unlimited time. Core is the retrieval
+comparison and the authorization comparison; reranking, chunking sweeps, citation enforcement and
 metadata experiments are all real work and all Stretch. Getting BM25 → vector →
 hybrid measured honestly against a frozen set is worth more than a half-finished
 system with five techniques in it.
@@ -109,12 +136,17 @@ authorization/correctness failure in the naive design.**
 3. **Add embeddings, then RRF fusion**, re-measuring at each step. Report per
    configuration — lexical, vector, hybrid — never as one blended number. Use one
    default chunking strategy; do not sweep yet.
-4. **Build the pre-filter authorization.** Authorization ahead of the search.
-5. **Reproduce the post-filter failure.** Build the wrong version, show it silently
-   returning fewer authorized results than exist, then write the test asserting the
-   pre-filter returns exactly k when k exist. The pre-filter is only *demonstrably*
-   better once the post-filter failure has been reproduced. **This is the week's
-   second headline and it is not optional.**
+4. **Reproduce the global-ANN-plus-filter failure.** Build it, read the query
+   plan to confirm the predicate is applied after the scan, and show it silently
+   returning fewer authorized results than exist. This is the baseline, and the
+   structural approaches are only *demonstrably* better once it has been
+   reproduced. **This is the week's second headline and it is not optional.**
+5. **Compare at least two more approaches from the table** against it — one of
+   iterative scan, exact search over the authorized subset, partial indexes, or
+   tenant partitioning, plus whichever second one suits your data. Record recall,
+   latency, and whether each guarantee is structural or best-effort. Then write
+   the test asserting your chosen approach returns exactly k authorized results
+   whenever k exist.
 6. **Business: assemble the pain register.** Every pain you have heard or inferred,
    scored, with an evidence tag per row. Instructions in
    [consulting-and-saas.md](../business/consulting-and-saas.md).
@@ -153,8 +185,9 @@ demo cannot exhibit the defect this week is about.
 
 - NDCG@5 and MRR, **per configuration** — lexical, vector, hybrid — against the
   frozen set. Three numbers side by side is the deliverable.
-- Pre-filter versus post-filter: authorized results returned when k exist, for
-  both. The gap is the finding.
+- Authorized results returned when k exist, **per approach**. The gap between
+  global-ANN-plus-filter and the structural options is the finding.
+- Latency per approach, and whether each guarantee is structural or best-effort.
 - Cost per answer, in tokens.
 - *(Stretch)* Reranking lift, and what it could not fix because recall was already
   lost. Rerank latency p50/p95 on CPU.
@@ -189,8 +222,10 @@ one, and make the answer admit when it could not tell.
 - [ ] Frozen 15–20 pair label set with a digest, dated before any tuning.
 - [ ] Lexical baseline with metrics; vector; hybrid with RRF — metrics reported per
       configuration.
-- [ ] Pre-filter authorization, plus the reproduced post-filter failure and the
-      exactly-k test.
+- [ ] The reproduced global-ANN-plus-filter failure, with the query plan showing
+      the predicate applied after the scan.
+- [ ] At least three approaches compared on recall, latency and guarantee kind,
+      with the chosen one implemented and its exactly-k test.
 - [ ] Pain register with per-row evidence tags.
 - [ ] *(Stretch, if reached)* reranking with measured lift and latency;
       cited-answer schema; chunking sweep; stale-documentation report.
@@ -200,8 +235,12 @@ one, and make the answer admit when it could not tell.
 - [ ] The same query under two tenants returns two different result sets.
 - [ ] NDCG@5 and MRR are reported for lexical, vector and hybrid separately,
       against a set provably frozen before the first tuning change.
-- [ ] The post-filter failure is **reproducible**, and a test asserts the
-      pre-filter returns exactly k authorized results whenever k exist.
+- [ ] The global-ANN-plus-filter failure is **reproducible**, evidenced by the
+      query plan rather than by assumption.
+- [ ] At least three approaches are compared, and a test asserts the chosen one
+      returns exactly k authorized results whenever k exist.
+- [ ] The write-up says which guarantees are structural and which are best-effort;
+      nothing equates a SQL `WHERE` with pre-filtered ANN.
 - [ ] The label set's digest and freeze date are recorded, and no tuning change
       predates them.
 - [ ] The pain register exists with an evidence tag on every row.
@@ -212,15 +251,18 @@ one, and make the answer admit when it could not tell.
    about the fusion?
 2. Before you measured, which configuration did you expect to win? What did the
    frozen set say instead?
-3. The post-filter version passes a test asserting "no unauthorized content was
+3. The broken version passes a test asserting "no unauthorized content was
    returned". Which other tests in your codebase pass for a similarly wrong
    reason?
+4. Which approach did you choose, and at what corpus size or ACL granularity would
+   you have to change it?
 
 ## Evidence
 
 - Frozen label set, its digest and freeze date.
 - Metrics table: lexical, vector, hybrid, side by side.
-- The post-filter reproduction and the exactly-k test.
+- The global-ANN-plus-filter reproduction, with its query plan.
+- The approach comparison table, and the exactly-k test for the chosen one.
 - Pain register.
 - Anything from Stretch that was actually reached, and a note of what was not.
 

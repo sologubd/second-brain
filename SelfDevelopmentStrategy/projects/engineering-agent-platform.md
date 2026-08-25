@@ -233,30 +233,36 @@ used as a **scheduler hint** for predicting collisions; the **actual changed-fil
 set** inspected after every run as the only truth. Re-verification when the merge
 base moved. Version column and rebuild-on-conflict for real overlaps.
 **Demo counts when.** N workers with ≥30% killed mid-task strand nothing and
-duplicate nothing; the dead-letter path is exercised deliberately; and a collision
-visible only in the *actual* diffs is caught before merge, rebuilt and re-verified.
+duplicate nothing *among internal effects and the external effects week 6 marked
+guaranteed* — unresolved external effects may duplicate and must be detected and
+classified; the dead-letter path is exercised deliberately; and a collision visible
+only in the *actual* diffs is caught before merge, rebuilt and re-verified.
 **Done.** 100% of tasks reach a recorded terminal state; reclaim visible in
 telemetry; nothing treats declared scope as proof of independence.
-**Metrics.** Stranded and duplicated counts; lease-expiry-to-reclaim latency; scope
-prediction accuracy (actual set inside declared, which will not be 100%); collisions
-the prediction missed.
+**Metrics.** Stranded count; duplicate counts in two buckets — guaranteed effects
+(must be zero) and unresolved external effects (detected and classified);
+lease-expiry-to-reclaim latency; scope prediction accuracy (actual set inside
+declared, which will not be 100%); collisions the prediction missed.
 **Failure modes discovered.** _(fill this in)_
 
 ### 9. Evals and regression gates · week 9
 
 **Why.** Eight weeks of prompts tuned by feel, and no idea whether last Tuesday's
 edit helped.
-**Build.** ≥10 real tasks with known outcomes, frozen with a digest. Two tiers
-reported separately: deterministic assertions, and N=5 replay with environment
+**Build.** 5 real tasks with known outcomes, frozen with a digest. Two tiers
+reported separately: deterministic assertions, and N=3 replay with environment
 reset. Baseline recorded, candidate compared on the identical suite. Threshold as a
-bound against last-known-good, with a written re-baselining condition. A rescore
-tier — cheap check first, model judge only on disagreement — is a later refinement,
-and a judge you have not calibrated is a number you cannot use.
-**Demo counts when.** Tiers report separately, the pass-rate bound is stated, and a
-**real regression is caught**.
+bound against last-known-good, with a written re-baselining condition. Growing to
+10–20 tasks at N=5 is later work. A rescore tier — cheap check first, model judge
+only on disagreement — is a later refinement, and a judge you have not calibrated
+is a number you cannot use.
+**Demo counts when.** Tiers report separately, the pass-rate bound is stated, and an
+**injected known degradation is blocked**. A naturally occurring regression is bonus
+evidence, never the acceptance condition.
 **Done.** Baseline recorded and candidate compared on the identical frozen suite;
 each tier's blind spot named in one line.
-**Metrics.** Pass-rate distribution; regressions caught and whether each was real.
+**Metrics.** Pass-rate distribution; degradations blocked and the margin by which
+each missed the bound.
 **Failure modes discovered.** _(fill this in)_
 
 ### 10. Security boundaries · weeks 11–12

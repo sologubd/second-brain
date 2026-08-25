@@ -178,15 +178,24 @@ was durably written, never from what a dead process believed it had done.
   whose effect exists, and one marked finished whose effect is missing.
 - **Safe failure.** Continue from the durable pointer and nothing else. Where
   pointer and world disagree, stop.
-- **Recovery.** Re-run from the stored pointer. The transaction recording
-  completion is the one that produced the effect, so repeating is harmless *by
-  design* rather than by discipline — the only kind of safety that holds at four
-  in the morning.
+- **Recovery.** Re-run from the stored pointer. For **internal** effects this is
+  harmless *by design* rather than by discipline, because the transaction
+  recording completion is the one that produced the effect. For **external**
+  effects it is not harmless and you have no mechanism yet — a re-run may repeat
+  them, and that is the open crash window this week documents rather than closes.
 - **Logging.** The pointer at kill time and at resume, and the wall-clock distance
-  between them.
-- **Proving test.** Kill at each boundary in turn; assert the resumed run reaches
-  the undisturbed terminal state and that nothing happened twice. **Point it at
-  last week's in-memory version and it must break.**
+  between them. Plus, for every external effect, whether the resumed run repeated
+  it — recorded, not prevented.
+- **Proving test.** Kill at each boundary in turn and assert two different things,
+  because they are different claims:
+  - *Internal effects:* the resumed run reaches the undisturbed terminal state and
+    nothing happened twice. **Point it at last week's in-memory version and it
+    must break.**
+  - *External effects:* every mismatch between durable state and the observable
+    world is **detected and logged**. The assertion is that the detector fired and
+    classified the mismatch — not that no duplicate occurred. A duplicate external
+    effect here is an expected result, and asserting it away would be asserting a
+    guarantee you have not built.
 
 ## Deliverables
 

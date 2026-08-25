@@ -59,9 +59,12 @@ usable-ideas-per-page. → **Weeks 5, 8**.
 ## Retrieval and evaluation
 
 **[Vector search filtering: pre- vs post-filter](https://qdrant.tech/articles/vector-search-filtering/)**
-Why post-filtering breaks correctness and leaks existence in one move, and how
-filtered traversal is done properly. The concept transfers to pgvector; the
-operational burden of a second store does not. → **Week 10**.
+Why filtering after an approximate scan breaks correctness and leaks existence in
+one move, and how filtered traversal is done properly. The *concept* transfers to
+pgvector; the implementation does not — pgvector has no equivalent filtered
+traversal, so read this for the failure mode and then compare pgvector's actual
+options (iterative scan, exact search over the authorized subset, partial indexes,
+partitioning) on your own data. → **Week 10**.
 
 **[Offline retrieval evaluation](https://www.pinecone.io/learn/offline-evaluation/)** (Pinecone)
 precision@k, recall@k, MRR, NDCG@k — and why rank-blind metrics let a system pass

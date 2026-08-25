@@ -19,9 +19,10 @@ reranking → **permission filtering** → LLM → cited answer.
 
 Read that carefully, because the build deliberately violates it. The diagram places
 permission filtering after reranking. Implemented that way it is a disclosure
-vulnerability, so the actual system pulls authorization **ahead of the search**. The
-diagram describes the data a user sees; it is not an execution order, and treating
-it as one is the exact mistake this project exists to teach.
+vulnerability, so the actual system makes authorization **constrain the searchable
+candidate universe**. The diagram describes the data a user sees; it is not an
+execution order, and treating it as one is the exact mistake this project exists to
+teach.
 
 ## Capability backlog
 
@@ -32,21 +33,23 @@ crux, and it is the thing an agent gets wrong by default.
 
 **Build.** BM25 lexical index first and measured on its own. Then local embeddings
 in pgvector. Then Reciprocal Rank Fusion, hand-implemented in ~20 lines with k
-fixed at 60. Then the **pre-filter** authorization step, ahead of the vector
-search. Then reproduce the post-filter failure, and write the test that asserts
-exactly k authorized results whenever k exist.
+fixed at 60. Then authorization that genuinely constrains the candidate set —
+reproduce the global-ANN-plus-filter failure first, compare it against at least two
+structural approaches, and write the test that asserts exactly k authorized results
+whenever k exist.
 
 **Demo counts when.** The same query under two tenants returns two different result
-sets, **and** the post-filter test fails as designed. The exit condition names a
-test of the *wrong* implementation deliberately: the pre-filter is only
-demonstrably better once the post-filter failure has been reproduced.
+sets, **and** the global-ANN-plus-filter test fails as designed. The exit condition
+names a test of the *wrong* implementation deliberately: a structural approach is
+only demonstrably better once the broken one has been reproduced.
 
 **Done.** A 15–20 pair labelled query set exists, frozen with a digest **before any
 tuning**. Lexical, vector and hybrid each measured against it separately.
 
 **Metrics.** NDCG@5 and MRR per configuration — lexical, vector, hybrid, reported
-separately. Authorized results returned when k exist, pre-filter versus post-filter
-— the gap is the finding.
+separately. Authorized results returned when k exist, per authorization approach —
+the gap is the finding. Latency per approach, and whether each guarantee is
+structural or best-effort.
 
 Everything past this — reranking, chunking sweeps, citation enforcement, metadata
 experiments — is capability 2 and it is Stretch. The proof week 10 owes is the
@@ -106,18 +109,34 @@ permission assertion.
 
 ## Constraints
 
-**Filter before you search, not after.** The correctness half: post-filtering runs
-the ANN search first and then discards unauthorized hits from that k, so an
-authorized but lower-ranked chunk is pushed out entirely and the user receives fewer
-than k results — sometimes zero — from a corpus that genuinely contained a good
-match. The security half is worse: **result count, latency and partial scores leak
-the existence of documents the user may not see**, even when no forbidden text is
-ever returned.
+**Authorization must constrain the searchable candidate universe.** That is the
+requirement; how you satisfy it is the engineering.
 
-Ask an agent to add access control and it generates the post-filter form by default,
-because that is the readable form. It compiles, it passes a happy-path test, and it
-fails precisely when it matters. A test asserting only *no unauthorized content was
-returned* passes over both halves — which is why the test asserts the **count**.
+The correctness half: when the approximate scan runs over the whole index and the
+predicate is applied to what it returns, an authorized but lower-ranked chunk is
+pushed out entirely and the user receives fewer than k results — sometimes zero —
+from a corpus that genuinely contained a good match. The security half is worse:
+**result count, latency and partial scores leak the existence of documents the user
+may not see**, even when no forbidden text is ever returned.
+
+**A SQL `WHERE` clause beside a vector-index scan is not automatically pre-filtered
+ANN.** With a global HNSW or IVFFlat index the planner may scan first and filter
+after, which is the failure above wearing the syntax of the fix. Read the query
+plan; the SQL text does not tell you which you got.
+
+Five approaches worth comparing, and the right one depends on corpus size and ACL
+granularity: global ANN plus filter (the broken baseline), iterative scan
+(better, still probabilistic, cost unbounded when the authorized subset is sparse),
+exact search over the authorized subset (structural, degrades with subset size),
+partial indexes (structural, needs a small stable partition set), and tenant
+partitioning or separate tables (strongest separation, operational overhead, wrong
+for fine-grained per-document ACLs).
+
+Ask an agent to add access control and it generates the global-scan-plus-predicate
+form by default, because that is the readable form. It compiles, it passes a
+happy-path test, and it fails precisely when it matters. A test asserting only *no
+unauthorized content was returned* passes over both halves — which is why the test
+asserts the **count**.
 
 **Lexical first, then embeddings.** The retrieval order is the learning order. BM25
 is cheap, deterministic, and its failure modes — synonymy, vocabulary mismatch — are
@@ -162,7 +181,7 @@ security week.
 
 | Capability | Its demo counts as run when |
 |---|---|
-| Permission-filtered retrieval | the same query under two tenants returns two different result sets, and the post-filter test fails as designed |
+| Permission-filtered retrieval | the same query under two tenants returns two different result sets, and the global-ANN-plus-filter test fails as designed |
 | Measured retrieval | metrics print per configuration against a provably frozen set |
 | Trust boundary | an untrusted-input turn is refused an external-send tool, by code |
 | Policy authorization | a role with no matching rule is denied, from one function |
