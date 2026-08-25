@@ -3,8 +3,9 @@
 ## Outcome
 
 By Sunday several workers process tasks concurrently against one queue, with at
-least a third of them killed mid-task, and nothing is stranded, lost or duplicated
-in effect. You also know how often a task's *actual* changed files exceeded what
+least a third of them killed mid-task, and nothing is stranded or lost — and
+nothing duplicated among the effects week 6 gave you a mechanism for, with the
+rest detected and classified. You also know how often a task's *actual* changed files exceeded what
 you predicted — and your safety no longer depends on that prediction being right.
 
 ## Why now?
@@ -147,7 +148,12 @@ deliberate cases:
 
 ## Measure
 
-- Tasks stranded: zero. Duplicated effects: zero.
+- Tasks stranded: zero.
+- **Duplicated effects: zero — for internal effects, and for the external effects
+  week 6's table marked guaranteed.** External effects still marked *unresolved*
+  may duplicate; those must be detected and classified, and their count reported
+  separately. Folding them into one "zero duplicates" figure would claim a
+  guarantee no mechanism supports.
 - Tasks reaching a recorded terminal state: 100%, dead-letters included. "No
   errors observed" is not a terminal-state claim.
 - Dead-letter path exercised at least once; orphan reclaim fired at least once,
@@ -198,7 +204,8 @@ quietly overwrite each other — including when the overlap was *not* predicted.
       every run; version-column conflict path for real overlaps.
 - [ ] Re-verification on a moved merge base, asserted in a test.
 - [ ] Chaos run: ≥30% of workers killed, telemetry showing zero stranded and zero
-      duplicated, dead-letter and reclaim both exercised.
+      duplicated among guaranteed effects, duplicates of unresolved external
+      effects detected and classified, dead-letter and reclaim both exercised.
 - [ ] Scope-prediction log: declared versus actual per task, with overruns marked
       legitimate or not.
 - [ ] Overlapping-files report, five parts, with the *observed*-collision case red
@@ -207,7 +214,10 @@ quietly overwrite each other — including when the overlap was *not* predicted.
 
 ## Done when
 
-- [ ] Zero tasks stranded and zero duplicated effects across the chaos run.
+- [ ] Zero tasks stranded across the chaos run, and zero duplicated effects among
+      internal effects and the external effects week 6 marked guaranteed.
+- [ ] Duplicates of *unresolved* external effects are detected and classified
+      rather than absent, and counted separately from the figure above.
 - [ ] 100% of enqueued tasks reached a recorded terminal state.
 - [ ] The dead-letter path and orphan reclaim each fired at least once, visible in
       telemetry.

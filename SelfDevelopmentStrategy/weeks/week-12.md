@@ -38,9 +38,13 @@ the model agreeing. *Instructing* an agent to stay within its permissions is not
 permission system — **model refusal is not a security guarantee.**
 
 **A sandboxed code-execution surface.** Agent-executed code cannot reach the
-network. The concept is one paragraph: a container is not a hard boundary, a
-microVM is. Do not spend the week studying sandbox internals; spend it making the
-boundary real and testing that it holds.
+network. The concept is one paragraph: **containers share the host kernel, so a
+kernel vulnerability crosses them; microVMs provide a stronger virtualization
+boundary with a much smaller shared surface. Neither is absolute** — hypervisors
+have escapes too, and both depend on how you configure them. Pick the strength
+that matches what the agent-executed code is allowed to be, and do not spend the
+week studying sandbox internals; spend it making the boundary real and testing
+that it holds.
 
 **An append-only audit log with provenance** on every tool call. A refusal with no
 record is an assertion about the past rather than evidence of it.
@@ -48,8 +52,8 @@ record is an assertion about the past rather than evidence of it.
 ## Learn
 
 - The least-agency section of the OWASP agentic PDF, if you have not already.
-- One paragraph on sandbox depth: container versus microVM, and what each actually
-  guarantees. That is genuinely all you need.
+- One paragraph on sandbox depth: container versus microVM, what shared surface
+  each leaves, and what each actually guarantees. That is genuinely all you need.
 
 ~1.5h. Light on reading; the retrospective is where the hours go.
 
