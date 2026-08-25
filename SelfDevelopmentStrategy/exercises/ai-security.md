@@ -4,6 +4,13 @@ Six attacks, every one run **against your own system**, every rate measured on y
 own build. No industry percentage appears in this file or in any report produced
 from it: a borrowed number proves nothing about the thing you shipped.
 
+**Two are Core, four are not.** Weeks 11 and 12 require *indirect injection* and
+*the confused deputy* — one attack each, done properly, with the mitigation
+enforced in code. Corpus poisoning, exfiltration beyond the single covert route,
+malicious tool output and memory poisoning are Stretch or belong to months 4–6.
+You do not need every class of agent security in two calendar weeks; you need one
+attack you can prove you actually defeated.
+
 ## The method, every time
 
 Control run → attack → measure → apply **exactly one structural mitigation** →
@@ -47,7 +54,7 @@ is what makes hijack possible at all.
 
 ## The six attacks
 
-### 1. Corpus poisoning against your own index · week 11
+### 1. Corpus poisoning against your own index · week 11 *(Stretch)*
 
 Seed an injection corpus into the index you built the week before — **your own, not
 a fixture** — using at least three distinct techniques: instruction override,
@@ -63,26 +70,34 @@ removed; the three-way category placement, saying why not the other two rows.
 *Also measure retrieval precision*, to show whether the mitigation cost you ordinary
 answer quality.
 
-### 2. Indirect injection against the retrieval agent · week 11
+### 2. Indirect injection against the retrieval agent · week 11 **(Core)**
 
-Build the untrusted-content boundary first: provenance at ingest, trust-tiered
-retrieval, and a hard separator between operator instructions and document content.
-Then run the suite against a fixed query set with at least three payload styles, in
-both arms.
+Build the defence first, and be clear about which part of it is which.
+**Provenance at ingest, trust tiers and a delimiter between operator instructions
+and document content are defense in depth** — they reduce instruction/data
+confusion and give you provenance to reason about, and they guarantee nothing,
+because a delimiter is a convention the model is more likely to respect rather
+than a control it cannot cross. **The boundary is the code-enforced capability
+restriction**: a turn that consumed untrusted content cannot reach an
+external-send tool, decided outside the model.
 
-Payloads live in documents the retrieval layer selects **on their own merits** — one
-pasted into the prompt tests a different class. The boundary is enforced **in code**;
-telling the model to ignore document instructions is the prompt-level patch this
-exercise exists to discredit.
+Then run the suite against a fixed query set with at least three payload styles,
+in both arms. Payloads live in documents the retrieval layer selects **on their own
+merits** — one pasted into the prompt tests a different class. Telling the model to
+ignore document instructions is the prompt-level patch this exercise exists to
+discredit.
 
 *Record, for every attempt, whether an external-send tool was reached.* That field
 separates an attack that bent the answer from one that reached the network, and they
 are not equally bad.
 
-*Prove the refusal came from code* with an assertion that fails when the boundary is
-disabled.
+*Prove the refusal came from code* with an assertion that fails when the control is
+disabled. This is not a formality — it is the only evidence that separates a
+security property from a model that happened to comply. **separator ≠ security
+boundary · model refusal ≠ security guarantee · prompt instruction ≠ authorization
+control.**
 
-### 3. Exfiltration and the trifecta break · week 11
+### 3. Exfiltration and the trifecta break · week 11 **(one covert route: Core)**
 
 Get private data out by at least two routes: a direct request, and at least one
 **covert** channel where the data rides inside something helpful-looking — a
@@ -101,7 +116,7 @@ Defend the claim in writing against the alternative reading.
 *Also measure token cost per attempt:* a covert channel that costs an attacker very
 little is a different risk from one that costs a lot.
 
-### 4. The confused deputy · week 12
+### 4. The confused deputy · week 12 **(Core)**
 
 Make a low-privilege step cause a high-privilege one to act, without either being
 compromised.
@@ -122,7 +137,7 @@ from the audit log. The refusal's audit entry contains the id of the original
 approved request it was compared against. A test asserts the check fires ≥2 times
 inside a single multi-action task.
 
-### 5. Malicious tool output at the boundary · week 12
+### 5. Malicious tool output at the boundary · week 12 *(Stretch, or month 4)*
 
 Treat a tool's return value as attacker-controlled, because it is.
 

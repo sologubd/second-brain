@@ -113,9 +113,44 @@ written today would be a guess wearing a schedule.
 **Roughly 15 hours a week**: 2–3h learning, 8–10h building and testing, 2–3h
 business and discovery. A week file is a unit of work, not a unit of time.
 
+**Every week splits into Core and Stretch.** Core is the smallest set of work
+that delivers the week's capability, and it is what fits in fifteen hours. Stretch
+is real, valuable work that is not required to claim the capability — attempt it
+only once Core is done. **A week is DONE on Core alone.** Stretch left untouched
+is the normal outcome, not a shortfall.
+
 **If unfinished, continue next week. Do not double the workload.** Slip the
 calendar. Twelve week-files will probably take sixteen to eighteen calendar
 weeks, and that is the plan, not a slip.
+
+## Learning boundary
+
+You are using coding agents throughout — that is the point of the year. But it
+creates a specific risk: **satisfying an exercise by invoking a framework
+capability instead of implementing the mechanism the exercise exists to teach.**
+
+Existing agent frameworks — Claude Code, Codex, OMC, agent skills, subagents —
+**may** be used for research, code generation, debugging, brainstorming,
+independent code review, and verifying your own implementation.
+
+They **must not** substitute for the mechanism currently being learned. If the
+week's topic is task orchestration, persistence, retries, evals, queueing, the
+review pipeline, permissions or approval boundaries, that mechanism has to exist
+in **your** project code and stay testable without the framework's equivalent
+feature standing in for it.
+
+The test:
+
+> **If I disable OMC tomorrow, does the artifact I claim to have built still
+> exist?**
+
+If no, the learning objective was outsourced. Using a subagent to write your
+queue's orphan-reclaim function is leverage. Using a subagent *as* your queue is
+not — you would have learned how to configure someone else's queue, which is a
+different and much smaller skill.
+
+This is not a ban. Use the tooling hard; just do not let it hold the part you
+came to learn.
 
 ## How progress is measured
 
@@ -132,8 +167,10 @@ certificate, a description.
 ## Before week 1
 
 - Python 3.12+ in a virtualenv; Git 2.35+ (`git worktree list` must answer).
-- Your coding-agent CLI, signed in through the subscription rather than a
-  metered API key. That boundary is the whole cost model.
+- Your coding-agent CLI, signed in. Weeks 1–4 drive it as a subprocess, which
+  keeps early throwaway runs cheap; whether to stay on the CLI or move to an SDK
+  or the API is a decision you make later, on requirements
+  ([why](projects/engineering-agent-platform.md#ground-rules)).
 - A repository the runner can operate on — your own real project, or a throwaway
   sandbox beside this one. Not this repository: there is no application code
   here for an agent to change.

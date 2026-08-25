@@ -5,8 +5,7 @@
 By Sunday the input is no longer a task file you wrote for the agent — it is a
 real issue written for a human. The harness extracts the requirement, researches
 the codebase, decides what it can answer itself and what genuinely needs you,
-plans, implements, verifies, reviews and opens a PR. Five real features through
-it.
+plans, implements, verifies and opens a PR. Five real features through it.
 
 ## Why now?
 
@@ -33,9 +32,7 @@ implementation
   ↓
 verification (week 2's gate)
   ↓
-review
-  ↓
-pull request
+pull request              ← automated review is Stretch this week
 ```
 
 **The load-bearing distinction, and the whole learning objective of the week:**
@@ -51,10 +48,11 @@ readings, and why code cannot settle it. An agent that asks about everything is
 useless, and one that asks about nothing is dangerous; the interesting engineering
 is the classifier between them.
 
-Add a **review step** before the PR: an automated pass over the diff against a
-short checklist, output separately from the verification result. Keep it simple —
-one pass, a few named axes, each citing lines. Do not build a five-axis scoring
-system yet.
+An automated review step before the PR is **Stretch**, not Core. Week 2's
+verification gate is what keeps bad diffs out this week, and the classifier above
+is the thing actually being learned. If you do build the review pass, keep it to
+one pass over a few named axes, each citing lines — the five-axis scored version
+belongs to months 4–6.
 
 ## Learn
 
@@ -67,6 +65,8 @@ system yet.
 ~2h.
 
 ## Tasks
+
+### Core — required (~15h: 2h learning, 10h building/testing, 3h business)
 
 1. **Ingest a real issue.** Fetch an issue by id, and extract structured
    requirements from its prose body. Keep the raw body — you will need it in week
@@ -81,15 +81,25 @@ system yet.
 4. **Build the plan step.** A written implementation plan before any code: files
    to touch, the approach, and what will verify it. The plan is an artifact you
    read, not a thought the agent has.
-5. **Add the review step.** One automated review pass over the diff, findings
-   cited by line, reported separately from verification.
-6. **Run five real features and score them.** Metrics below.
-7. **Business: 5 sends, and document one workflow.** Pick one company from the
+5. **Run five real features and score them.** Metrics below.
+6. **Business: 5 sends, and document one workflow.** Pick one company from the
    prospect list and document one of its workflows end to end from public
    information: named steps, estimated frequency, estimated time cost per
    occurrence, systems touched. Every unevidenced step is recorded as a gap
    rather than guessed. Tag it `simulated`. This is the artifact you show when a
    prospect asks who else you have done this for.
+
+### Stretch — only after Core is DONE
+
+- **Add the automated review step**: one pass over the diff against a short
+  checklist, findings cited by line, reported separately from the verification
+  result. Useful, and not needed to claim the feature workflow — the verification
+  gate from week 2 is what actually keeps bad diffs out this week. If you do build
+  it, keep it to one pass and a handful of named axes; the five-axis scored
+  version belongs to months 4–6.
+- **Run a sixth feature with the research step disabled** and compare the
+  unnecessary-question count. That is the cheapest way to find out whether
+  research is earning its place or just adding a stage.
 
 ## Use it for real
 
@@ -109,7 +119,8 @@ You need to find out whether the classifier catches it.
   the repository. This is the metric that matters most this week.
 - **Missed ambiguities**: genuine product ambiguities the agent guessed at
   instead of parking. Count the deliberate one.
-- Unnecessary changes: files touched outside what the plan named.
+- Unnecessary changes: files touched that the plan did not name **and** that the
+  task did not turn out to need. Those are two different things — see week 8.
 - PR acceptance: PRs you would merge, over PRs opened.
 
 ## Failure exercise
@@ -140,7 +151,7 @@ surface rather than a hypothetical one.
 ## Deliverables
 
 - [ ] Feature pipeline: issue → requirement extraction → research → ambiguity
-      detection → plan → implementation → verification → review → PR.
+      detection → plan → implementation → verification → PR.
 - [ ] Ambiguity classifier with the two-way distinction implemented, and the
       parked state naming the specific incompatibility.
 - [ ] Written implementation plan artifact per task.

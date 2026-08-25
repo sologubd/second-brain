@@ -3,10 +3,10 @@
 ## Outcome
 
 By Sunday you have redirected your own agent using content it *retrieved* rather
-than anything you typed, counted what fraction of those attempts actually changed
-its behaviour, got private data out through a channel that does not look like one,
-and then broken a leg of the trifecta **structurally** rather than filtering for
-it.
+than anything you typed, got private data out through a channel that does not look
+like one, and then made both impossible **in code** — with an assertion that fails
+when you switch the control off. You can state precisely which part of your
+defence is a security boundary and which part is defense in depth.
 
 ## Why now?
 
@@ -20,23 +20,62 @@ view is the one that decides whether the first was built properly.
 
 ## Build
 
-**The untrusted-content boundary, in code**, and in this order — build it before
-you run the second arm of each attack:
+### Where the security boundary actually is
+
+This is the distinction the week exists to teach, and it is easy to state wrongly.
+
+**Structural context separation** — provenance tags, trust tiers, a clear
+delimiter between operator instructions and document content — is worth building.
+It reduces instruction/data confusion, it gives you provenance you can log and
+reason about, and it is genuine **defense in depth**.
+
+**It does not make prompt injection impossible.** A separator is a convention the
+model is *more likely* to respect, not a control it *cannot* cross. Treating it as
+a boundary is the mistake, because it moves the guarantee inside the model — and
+anything inside the model is a probability, not a property.
+
+The real boundary lives outside the model's cooperation:
+
+```
+untrusted input observed
+        ↓
+code-enforced policy          ← a decision your code makes, not the model
+        ↓
+sensitive capability unavailable, or gated behind an explicit
+trusted authorization path
+```
+
+Concretely: a turn that consumed untrusted retrieved content **cannot** invoke an
+external-send capability. Not *should not* — the capability is not reachable from
+that turn's tool set, and the code that decides this never reads the untrusted
+content at all.
+
+Three inequalities worth writing on the wall:
+
+- **prompt instruction ≠ authorization control**
+- **separator ≠ security boundary**
+- **model refusal ≠ security guarantee**
+
+A prompt-level patch asks the model to be careful and moves the rate a little; a
+structural change removes the class. Which of the two you did is the examinable
+question, every time — and "I added a separator" is the first answer.
+
+### What to build
+
+In this order. Build it before you run the second arm of each attack:
 
 1. **Provenance tagging at ingest.** Every chunk records where it came from and
-   what tier of trust that origin carries.
-2. **Trust-tiered retrieval.** Retrieved content carries its tier through to the
-   context assembly.
-3. **A hard separator** between operator instructions and document content, which
-   the model cannot be argued across because it is not a request — it is structure.
-4. **Output validation** before anything leaves.
-5. **The structural trifecta break:** a turn that touched untrusted input in that
-   cycle cannot invoke an external-send tool. Enforced in code, and logged.
-
-**Telling the model to ignore instructions in documents is the prompt-level patch
-this week exists to discredit.** A prompt-level patch asks the model to be careful
-and moves the rate a little; a structural change removes the class. Which of the
-two you did is the examinable question, every time.
+   what tier of trust that origin carries. *(Defense in depth, and the input the
+   policy reads.)*
+2. **Trust-tiered retrieval.** Retrieved content carries its tier through to
+   context assembly. *(Defense in depth.)*
+3. **A delimiter** between operator instructions and document content.
+   *(Defense in depth — reduces confusion, guarantees nothing.)*
+4. **The code-enforced capability restriction.** Track, outside the model, whether
+   this turn has consumed untrusted content. If it has, the external-send tool is
+   **not in the tool set**. This is the actual control, and it is the only item in
+   this list that is one.
+5. **Output validation** before anything leaves, as a second layer behind (4).
 
 ## Method — the same shape for every attack
 
@@ -53,6 +92,9 @@ Non-negotiables, because they are what separate a measurement from a story:
 - **Detection means deviation from the control output, never recognition of a
   payload.** A detector that only catches payloads it has already seen is a
   denylist, and the next payload walks past it.
+- **The security property must come from code, not model cooperation.** Prove it by
+  disabling the control and watching the assertion fail. If the only evidence is
+  that the model declined, you have measured today's model, not your system.
 - **Zero borrowed industry percentages.** A number about somebody else's system
   proves nothing about yours. Measure your own or say nothing.
 
@@ -70,40 +112,62 @@ Non-negotiables, because they are what separate a measurement from a story:
 
 ## Tasks
 
-1. **Attack 1 — corpus poisoning.** Seed your own index with an injection corpus
-   using at least three genuinely distinct mechanisms: instruction override,
-   persona/role-play override, delimiter/format confusion. Three phrasings of one
-   mechanism do not count. Run a fixed query set against a clean control index and
-   the poisoned one. Measure the difference.
-2. **Attack 2 — indirect injection.** Payloads live in documents that the
-   retrieval layer selects **on their own merits** — one pasted into the prompt
-   tests a different class. At least three payload styles, both arms, and record
-   for every attempt whether an external-send tool was reached. That field
-   separates an attack that bent the answer from one that reached the network, and
-   they are not equally bad.
-3. **Attack 3 — exfiltration.** At least two routes, at least one **covert** — the
-   data riding inside something helpful-looking, such as a parameter in a URL the
-   agent offers. A direct ask alone tests refusal training, not architecture. Then
-   break a leg structurally and re-run both routes with the *same* payloads, not
-   improved ones.
-4. **Build the boundary** (the five pieces above), enforced in code, with an
-   assertion that fails when the boundary is disabled — that assertion is how you
-   prove the refusal came from code rather than from the model's cooperation.
-5. **Write the three-way category distinction** and place your own attacks on it.
-   Corpus poisoning, memory poisoning and goal hijack are routinely collapsed into
-   one thing; the table is in
-   [exercises/ai-security.md](../exercises/ai-security.md). A report that cannot
-   place its own attack on it has not understood what it ran.
-6. **State which trifecta leg you removed** — private data access, untrusted-content
-   exposure, or outbound communication — and which you merely *filtered*. Defend it
-   in writing against the alternative reading. A regex over outbound URLs is a
-   filter and must be labelled as one if that is what you built.
+### Core — required (~15h: 2.5h learning, 9.5h building/testing, 3h business)
+
+**One real indirect-injection path and one exfiltration path, each measured before
+and after a code-enforced mitigation.** That is the week. Additional attack
+classes are Stretch, or they belong to months 4–6.
+
+1. **Attack 1 — indirect injection, one path done properly.** The payload lives in
+   a document the retrieval layer selects **on its own merits** — one pasted into
+   the prompt tests a different class. Use a frozen query set. Record, for every
+   attempt, whether an external-send tool was reached: that field separates an
+   attack that bent the answer from one that reached the network, and they are not
+   equally bad.
+2. **Attack 2 — exfiltration, one covert route.** The data rides inside something
+   helpful-looking — a parameter in a URL the agent offers, for instance. A direct
+   ask alone tests refusal training, not architecture.
+3. **Build provenance tagging at ingest**, so origin and trust tier travel with
+   every chunk.
+4. **Build the code-enforced capability restriction** — the actual control. A turn
+   that consumed untrusted content cannot reach the external-send tool, decided
+   outside the model. **Write the assertion that fails when you disable it**: that
+   assertion is the only thing that proves the refusal came from code rather than
+   from the model's cooperation, and without it you have a hopeful system.
+5. **Measure both attacks, both arms.** Same payloads, same frozen query set,
+   exactly one mitigation between the arms. Report rates with denominators.
+6. **State what you actually did to the trifecta** — which leg you removed
+   (private data access, untrusted-content exposure, outbound communication) and
+   what you merely *filtered*. A regex over outbound URLs is a filter and must be
+   labelled as one. Defend the claim in writing against the alternative reading.
 7. **Business: the offer sketch.** Run the qualification checklist against the pain
    register, pick the highest qualified pain, and write a one-paragraph
    fixed-scope, fixed-price offer with an explicit exclusions list — exclusions
-   written *before* the price. Also resolve the SaaS evidence thresholds to concrete
-   numbers. Both in
+   written *before* the price. In
    [consulting-and-saas.md](../business/consulting-and-saas.md).
+
+### Stretch — only after Core is DONE
+
+- **Add the delimiter and trust-tiered retrieval** as defense in depth on top of
+  the code control, and measure whether they move the rate at all. Interesting
+  either way: if they barely move it, that is the week's lesson made numeric.
+- **Corpus poisoning as a separate attack**: seed your index with three genuinely
+  distinct mechanisms — instruction override, persona override, delimiter/format
+  confusion — against a clean control index. Three phrasings of one mechanism do
+  not count.
+- **A second and third payload style** on the injection path, to see whether your
+  control holds shape or only holds against what you thought of.
+- **A second exfiltration route**, including a direct request, for contrast with
+  the covert one.
+- **Write the three-way category distinction** — corpus poisoning versus memory
+  poisoning versus goal hijack — and place your own attacks on it, saying why not
+  the other rows. Table in
+  [exercises/ai-security.md](../exercises/ai-security.md). Cheap and clarifying;
+  do this one even if you skip the rest.
+- **Resolve the SaaS evidence thresholds** to concrete numbers with a line of
+  justification each.
+- **Retrieval precision before and after** the mitigation, to show whether the
+  control cost you ordinary answer quality.
 
 ## Use it for real
 
@@ -113,29 +177,28 @@ shipped.
 
 ## Measure
 
-Per attack, per technique, per arm, with the denominator stated:
+Per attack, per arm, with the denominator stated:
 
 - **Attack success rate** = attempts that changed agent behaviour ÷ attempts in the
-  fixed set.
+  frozen set.
 - **External-send rate** = attempts that reached an external-send tool ÷ hostile-text
-  turns. Before and after.
-- **Exfiltration success rate** per route, both arms, including the covert route
-  re-run post-fix and measured directly.
-- **Retrieval precision** before and after the mitigation — to show whether the
-  boundary cost you ordinary answer quality.
-- Token cost per attempt: a covert channel that costs the attacker very little is a
-  different risk from one that costs a lot.
+  turns. Before and after. **This is the headline number**, because it is the one
+  your code control is responsible for.
+- **Exfiltration success rate** for the covert route, both arms, re-run post-fix
+  with the same payload and measured directly.
+- *(Stretch)* retrieval precision before and after, and token cost per attempt.
 
 ## Failure exercise
 
-The three attacks above *are* this week's failure work, and the indirect-injection
-arm carries the five-part write-up:
+The attacks above *are* this week's failure work, and the indirect-injection arm
+carries the five-part write-up:
 
 - **Detection.** Hold the run against a twin over a clean corpus and look for
   divergence. You detect a difference between two outputs, not a known string.
-- **Safe failure.** Give retrieved text no standing: origin tagged at index time,
-  kept beyond a separator, and denied the power to authorise a call. All properties
-  of code, not requests.
+- **Safe failure.** Give retrieved text no standing. The load-bearing part is the
+  last one: **denied the power to authorise a call, in code.** Origin tagging and
+  the delimiter help and are not the control — a defence consisting only of those
+  two has asked the model nicely.
 - **Recovery.** Remove outbound capability from any turn that read hostile text in
   that cycle. That removes a leg rather than screening it, and telling those apart
   is the skill being examined.
@@ -147,34 +210,36 @@ arm carries the five-part write-up:
 
 ## Deliverables
 
-- [ ] Trust boundary: provenance at ingest, trust-tiered retrieval, hard operator/
-      document separator, output validation, structural trifecta break — with the
-      assertion that fails when the boundary is disabled.
-- [ ] Attack report covering all three attacks: three techniques minimum each,
+- [ ] Provenance tagging at ingest, with origin and trust tier on every chunk.
+- [ ] **The code-enforced capability restriction**, plus the assertion that fails
+      when it is disabled.
+- [ ] Attack report covering the injection path and the covert exfiltration route:
       rates before and after, denominators stated, per-attempt records including
       failures.
-- [ ] The three-way category distinction written out, with your attacks placed on
-      it and a reason for the rows you did *not* place them in.
-- [ ] The trifecta leg-removal argument, defended against the alternative reading.
-- [ ] Cited-answer contract hardened: an answer whose citation is absent from
-      retrieved context is rejected.
-- [ ] Offer sketch from the qualified pain register; SaaS evidence thresholds
-      resolved to concrete numbers with one line of justification each.
+- [ ] A written statement of which parts of your defence are security boundaries
+      and which are defense in depth.
+- [ ] The trifecta leg-removal argument, defended against the alternative reading,
+      with anything that is a filter labelled as one.
+- [ ] Offer sketch from the qualified pain register.
+- [ ] *(Stretch, if reached)* delimiter and trust tiers with their measured effect;
+      corpus poisoning; extra payload styles; the category distinction.
 
 ## Done when
 
-- [ ] At least 3 genuinely distinct techniques per attack, run against the same
-      frozen query set in both arms, with zero queries added or removed between
-      them.
-- [ ] Attack success rate is reported per technique, per arm, with its denominator.
-- [ ] Zero turns that touched untrusted input successfully invoked an external-send
-      tool after the mitigation.
+- [ ] The injection payload was selected by retrieval **on its own merits**, not
+      pasted into the prompt.
+- [ ] Both arms ran against the identical frozen query set, with zero queries added
+      or removed and exactly one mitigation between them.
+- [ ] Attack success rate and external-send rate are reported per arm, each with
+      its denominator.
+- [ ] **Zero** turns that touched untrusted input reached an external-send tool
+      after the mitigation.
 - [ ] The refusal is demonstrated to come from **code**, by an assertion that fails
-      when the boundary is disabled.
-- [ ] The report names exactly one trifecta leg as removed, with the reasoning
-      stated, and labels anything else as a filter.
-- [ ] At least one exfiltration route was covert, and it was re-run post-fix and
-      measured directly.
+      when the control is disabled. Nothing rests on the model having declined.
+- [ ] The write-up states plainly that the delimiter and trust tiers are defense in
+      depth, not a boundary — and names what the boundary actually is.
+- [ ] The exfiltration route was covert, and it was re-run post-fix with the same
+      payload and measured directly.
 - [ ] The report contains zero industry-sourced percentages.
 - [ ] The offer names exactly one outcome, lists ≥3 explicit exclusions, and the
       qualification checklist is answered on all 6 items with ≥4 yes.
@@ -182,8 +247,10 @@ arm carries the five-part write-up:
 ## Reflection
 
 1. Did your mitigation remove the class or reduce a rate? Name the property that
-   makes your answer true rather than hopeful.
+   makes your answer true rather than hopeful — and if the honest answer is "the
+   model complied", say so.
 2. If an attacker read your entire mitigation, which payload would they write next?
+   Would your **code** control still hold, or only your delimiter?
 3. Your agent holds private data, reads untrusted content and can reach the
    network. Which of the three is genuinely required by the product, and what would
    the product lose without it?
@@ -192,11 +259,11 @@ arm carries the five-part write-up:
 
 ## Evidence
 
-- Attack report: three attacks, all arms, all rates with denominators.
+- Attack report: both attacks, both arms, all rates with denominators.
 - Per-attempt records, failures included.
-- The boundary-disabled assertion.
-- Retrieval precision before and after.
-- Category-placement write-up and the leg-removal argument.
-- Offer sketch; resolved thresholds.
+- **The control-disabled assertion**, and proof it fails when the control is off.
+- The boundary-versus-defense-in-depth write-up and the leg-removal argument.
+- Offer sketch.
+- Anything from Stretch that was reached, and a note of what was not.
 
 **Hours logged:** learning ___ / building ___ / testing ___ / business ___

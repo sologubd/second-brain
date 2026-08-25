@@ -3,9 +3,10 @@
 ## Outcome
 
 By Sunday every step's completion is recorded durably before the next step
-starts, a `kill -9` anywhere in the pipeline resumes from what was actually
-written rather than from what a dead process believed, and you have reviewed your
-own platform against a real defect checklist for the first time.
+starts, and a `kill -9` anywhere in the pipeline resumes from what was actually
+written rather than from what a dead process believed. You also have a written
+list of the places where your durable state and the outside world can still
+disagree — the crash windows you are deliberately leaving open.
 
 ## Why now?
 
@@ -31,25 +32,71 @@ Three pieces:
    can be generated from it rather than written by hand — and that covers an error
    class no amount of reading finds. What stays a human decision is which states
    exist and what *done* means.
-2. **Completion recorded before the next step starts.** The transaction that
-   records a step's completion is the same transaction that produced its effect.
-   Not two commits, not a reconciliation pass afterwards.
+2. **Completion recorded before the next step starts** — with the transaction
+   boundary stated precisely, because this is where the week is easy to get
+   wrong. See below.
 3. **Resume from the durable pointer, and nothing else.** On restart, read the
    pointer and continue. Where the pointer and the observable world disagree,
    **stop** — do not guess. A guess either repeats an external effect or skips
    one, and afterwards neither is visible.
+4. **A disagreement detector.** On resume, reconcile the durable pointer against
+   what you can actually observe in the outside world, and record every mismatch.
+   That log is this week's most valuable artifact: it is the evidence that
+   justifies the outbox work later.
 
 Ask an agent for "a state machine" and you get the class-per-state form, which
 dies with the process. The whole point here is state as data in a row you can
 `SELECT`.
 
-Also this week: **write down the aggregates and invariants.** What must always be
-true, which aggregate owns it, and where it is enforced. Three columns, one table.
-It takes twenty minutes and it is the document that makes the transaction
-boundaries obviously correct rather than memorised.
+### What can and cannot share a transaction
 
-**Not yet:** retries (week 6), idempotency keys (week 6), the outbox (months 4–6),
-queues (week 8). This week the pipeline resumes; it does not yet absorb duplicates.
+The sentence *record completion in the same transaction as the effect* is true
+only for effects inside the same transactional system. Split them explicitly:
+
+**A — internal transactional effects.** A state transition plus rows your own
+Postgres owns: an attempt record, an audit row, a result blob. These genuinely
+share one transaction, and that is what makes repeating the step harmless — the
+effect and the record of it commit or roll back together.
+
+**B — external effects.** Creating a pull request, updating an issue, posting a
+comment, writing to a tracker, sending an email. **These cannot participate in
+your Postgres transaction at all.** There is no combination of ordering that
+makes them atomic with it:
+
+```
+BEGIN
+  mark step complete
+COMMIT              ← process dies here: state says done, PR was never created
+host.create_pr()
+
+  ...or the reverse...
+
+host.create_pr()
+BEGIN               ← process dies here: PR exists, state says not started
+  mark step complete
+COMMIT
+```
+
+Both orderings have a window, and swapping them only chooses which
+inconsistency you get.
+
+> **External-effect atomicity is NOT solved this week.**
+
+Do not build an outbox now. The crash window between a local commit and an
+outward call is a **documented failure surface** you are deliberately leaving
+open, and the disagreement log from piece 4 is what earns the outbox and relay in
+[months 4–6](../later/months-04-06.md). Building the mechanism before you have
+the log is exactly the pattern-before-pain failure this plan is arranged against.
+
+So what this week actually claims: **durable internal task state, resume from
+persisted state, and detection of disagreement between durable state and the
+observable external world.** That is a real and useful property. It is not
+end-to-end atomicity, and the write-up must not say it is.
+
+**Not yet:** retries (week 6), idempotency keys (week 6), the outbox and relay
+(months 4–6), queues (week 8). This week the pipeline resumes and *notices*
+disagreement; it does not yet absorb duplicates or close the external-effect
+window.
 
 ## Learn
 
@@ -57,34 +104,51 @@ queues (week 8). This week the pipeline resumes; it does not yet absorb duplicat
   isolation and the lost update it permits; unique and partial indexes as the only
   reliable dedup primitive; and that external APIs offer no isolation at all.
 - [Temporal's activity docs](https://docs.temporal.io/activities) — how a mature
-  system words its guarantee. Then write one paragraph naming what it solves that
-  your hand-built version does not, and whether that gap matters at your scale.
-- [A Philosophy of Software Design](https://web.stanford.edu/~ouster/cgi-bin/book.php)
-  chapters 4 and 5, for the architecture review below.
+  system words its guarantee: an activity may physically run more than once yet be
+  observed as completed once, because the guarantee lives in the durable log.
 
-~3h. This is the heaviest reading week of the twelve.
+~2.5h. Chapter 7 is the load-bearing read.
 
 ## Tasks
+
+### Core — required (~15h: 3h learning, 9h building/testing, 3h business)
 
 1. **Stand up Postgres and the task table.** State column, transition table,
    generated invalid-transition test suite.
 2. **Move progress out of process memory.** Every step boundary commits before
    the next step begins. Nothing load-bearing lives in a variable that dies with
    the process.
-3. **Write the aggregate-and-invariant table.** Three columns: invariant, owning
-   aggregate, where enforced.
+3. **Classify every effect your pipeline produces** as internal-transactional or
+   external, in a table. Two columns is enough. This is fifteen minutes of work
+   and it is what stops the rest of the week overclaiming.
 4. **Build the boundary-kill harness.** Kill the process at *every* step boundary
    in turn — not a sample — and assert the resumed run lands where an undisturbed
-   run lands. This is the failure exercise.
-5. **Architecture review #1.** Write the generated-code review checklist first,
-   then apply it to the platform as it stands, including to this week's own diff.
-   Instructions and the fourteen defect classes are in
-   [exercises/architecture.md](../exercises/architecture.md).
+   run lands **for internal state**. This is the failure exercise.
+5. **Log the external-effect disagreements.** For each kill point that leaves the
+   durable state and the outside world disagreeing, record which effect, which
+   direction (state ahead of the world, or world ahead of state), and what a
+   person would have to do to fix it by hand. Do not fix it in code.
 6. **Business: 9 sends, assisted.** Use the Business Operations Agent's
    extraction step ([BOA capability 1](../projects/business-operations-agent.md))
    to research prospects, and approve every draft before it leaves. Add the two
    follow-ups for earlier prospects; each must carry something the previous touch
    did not.
+
+### Stretch — only after Core is DONE
+
+- **Architecture review #1.** Write the generated-code review checklist around the
+  four questions, version it, and apply it to the platform including this week's
+  own diff. Instructions and the fourteen defect classes are in
+  [exercises/architecture.md](../exercises/architecture.md). Genuinely valuable —
+  and it is a 3–4 hour job that will not fit beside the state machine in the same
+  fifteen hours. If it slips, run it in week 6 or 7; what matters is that it
+  happens *before* review #2 in week 8, so the two are comparable.
+- **Write the aggregate-and-invariant table**: what must always be true, which
+  aggregate owns it, where it is enforced. Twenty minutes, and it makes the
+  transaction boundaries obviously correct rather than memorised.
+- **Compare against a reference.** Read Temporal's activity docs and write one
+  paragraph naming what it solves that your hand-built version does not, and
+  whether that gap matters at your scale.
 
 ## Use it for real
 
@@ -93,13 +157,16 @@ tasks, with real interruptions. Then kill it deliberately, everywhere.
 
 ## Measure
 
-- Kill points exercised, and how many produced the undisturbed terminal state.
-  Target: 100% of boundaries, all landing correctly.
-- Effects that occurred twice across the kill sweep. Target zero — and if it is
-  not zero, you have just found week 6's justification, which is a good outcome.
-- Kill-to-resume distance: how long work sat orphaned. Record p50 and the worst
-  case; without it "did it resume?" has only an anecdote as an answer.
-- Review findings: defect classes assessed with evidence, over 14.
+- Kill points exercised, and how many left **internal state** at the undisturbed
+  terminal position. Target: 100% of boundaries.
+- **External-effect disagreements**, counted and listed by kill point. Target is
+  emphatically *not* zero — you expect a nonzero number here, and that number is
+  the deliverable. A zero would mean either your pipeline has no external effects
+  yet or your detector is not looking.
+- Duplicate external effects observed across the sweep. Whatever this number is,
+  it is week 6's justification.
+- Kill-to-resume distance: how long work sat orphaned. p50 and worst case;
+  without it "did it resume?" has only an anecdote as an answer.
 
 ## Failure exercise
 
@@ -125,47 +192,49 @@ was durably written, never from what a dead process believed it had done.
 
 - [ ] Task state machine on Postgres: state enum, transition table, generated
       invalid-transition suite.
-- [ ] Durable step-completion recorded in the same transaction as the effect.
-- [ ] Resume path reading the durable pointer, with the disagreement case
-      stopping rather than guessing.
-- [ ] Aggregate-and-invariant table.
+- [ ] Durable step-completion committed with the **internal** effects it produced.
+- [ ] Effect classification table: every effect marked internal-transactional or
+      external.
+- [ ] Resume path reading the durable pointer, stopping rather than guessing where
+      it disagrees with the observable world.
 - [ ] Boundary-kill harness covering 100% of boundaries, with the five-part
       report and its proving test red against the in-memory build.
-- [ ] Architecture review #1: versioned checklist plus the review written as an
-      ADR.
+- [ ] **External-effect disagreement log**: the crash windows you found and are
+      deliberately leaving open, with the manual repair each would need.
 - [ ] 9 sends and the follow-ups logged, with per-touch attribution.
 
 ## Done when
 
-- [ ] Killing at every step boundary yields the undisturbed terminal state.
-- [ ] Zero effects occurred twice across the kill sweep — or the duplicates are
-      counted and classified, and week 6 is scoped against them.
+- [ ] Killing at every step boundary leaves **internal** state at the undisturbed
+      terminal position.
+- [ ] Every effect is classified internal-transactional or external, and the
+      internal ones demonstrably share a transaction with their state transition
+      (asserted by a rolled-back transaction leaving no rows).
+- [ ] The external-effect disagreement log exists and is **non-empty**, with each
+      entry naming the effect, the direction of the mismatch, and the manual
+      repair.
+- [ ] The write-up says plainly that external-effect atomicity is unsolved and
+      names the month that closes it. It does **not** claim end-to-end atomicity.
 - [ ] No load-bearing progress lives in process memory, and the kill harness
       proves it by failing against the previous build.
 - [ ] The invalid-transition suite is generated from the transition table, not
       hand-written.
-- [ ] The review checklist is versioned and carries at least 4 question
-      categories; the ADR names ≥3 of the 14 defect classes with cited evidence
-      rather than ticks.
-- [ ] Applying the checklist to this week's own diff produced at least one
-      recorded finding.
 
 ## Reflection
 
 1. Did you actually lose state in weeks 1–4, or did you build this because it is
    the obvious next thing? Answer honestly; the answer changes week 6.
-2. Which step's effect is hardest to observe, and how would you learn its pointer
-   was wrong?
-3. You marked several defect classes absent. Which absences rest on evidence, and
-   which on the fact that you have not built the surface where they would appear?
-   Those are not the same claim.
+2. Which step's effect is hardest to *observe*, and how would you learn its
+   pointer was wrong?
+3. Of the crash windows you found, which one would hurt most in practice — and is
+   that the same one that looks worst on paper?
 
 ## Evidence
 
 - Path to the state machine, transition table and generated suite.
-- Kill-sweep output: every boundary, terminal state, duplicates.
-- Aggregate-and-invariant table.
-- The versioned checklist and the review ADR.
+- Kill-sweep output: every boundary, internal terminal state, duplicates.
+- The effect classification table.
+- The external-effect disagreement log.
 - Send log.
 
 **Hours logged:** learning ___ / building ___ / testing ___ / business ___

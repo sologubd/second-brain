@@ -3,10 +3,11 @@
 ## Outcome
 
 By Sunday every tool the platform can call runs under a profile you can point at,
-an unapproved privileged action is refused and logged, agent-executed code cannot
-reach the network — and you have reviewed the whole platform, named at least two
-defects you are *accepting*, and issued a verdict or an explicit non-verdict on
-the first SaaS candidate.
+an unapproved privileged action is refused and logged, and agent-executed code
+cannot reach the network. You have made a confused-deputy forgery work and then
+made it fail. And you have issued a verdict — or an explicit non-verdict — on the
+first SaaS candidate, and rewritten months 4–12 against what twelve weeks actually
+taught you.
 
 ## Why now?
 
@@ -26,11 +27,15 @@ it may touch. A call outside its profile is refused and logged. Not "the agent h
 the union of every permission any of its steps ever needed" — that union is
 defect class 14, and it is the default shape generated code arrives in.
 
-**Scoped, short-lived credentials.** Tokens scoped to the task, expiring with it.
-
 **Approval gates on irreversible actions.** Explicit, per action, and — critically —
 **per action, not per session.** A session-level check falls to the same forgery
 the confused-deputy exercise builds.
+
+Note what makes these controls real, carrying week 11's distinction forward: a tool
+profile is enforced **in code at the call site**, and re-authorization is a
+comparison your code performs against a stored approval record. Neither depends on
+the model agreeing. *Instructing* an agent to stay within its permissions is not a
+permission system — **model refusal is not a security guarantee.**
 
 **A sandboxed code-execution surface.** Agent-executed code cannot reach the
 network. The concept is one paragraph: a container is not a hard boundary, a
@@ -46,36 +51,44 @@ record is an assertion about the past rather than evidence of it.
 - One paragraph on sandbox depth: container versus microVM, and what each actually
   guarantees. That is genuinely all you need.
 
-~2h. Light on reading; heavy on the review and the retrospective.
+~1.5h. Light on reading; the retrospective is where the hours go.
 
 ## Tasks
 
+### Core — required (~15h: 1.5h learning, 8.5h building/testing, 2h business, 3h retrospective)
+
 1. **Write tool profiles** for every tool, and enforce them at the call site.
    Refuse and log anything out of profile.
-2. **Scope credentials** to the task, with expiry.
-3. **Add per-action re-authorization** against the request a human actually
-   approved.
-4. **Sandbox the code-execution surface**, with network egress blocked, and a test
+2. **Sandbox the code-execution surface**, with network egress blocked, and a test
    asserting the block.
-5. **Build the append-only audit log** with provenance on every tool call and every
-   memory write.
-6. **Run the two attacks** — confused deputy, malicious tool output. Both below.
-7. **Architecture review #3.** Formalise the four recurring questions into a
-   five-axis rubric — correctness under repetition, crash-window durability,
-   concurrency, contract and boundary assumptions, privilege — and review the full
-   platform against the fourteen defect classes. **Name at least two defects you
-   are accepting**, each with a remediation month. A clean bill of health on a
-   system this size is the least credible possible output. Every finding from
-   review #1 is marked remediated, accepted, or re-reported — none dropped
-   silently. Details in
-   [exercises/architecture.md](../exercises/architecture.md).
-8. **Business: the verdict, or the refusal to issue one.** Apply the five kill
+3. **Add per-action re-authorization** against the request a human actually
+   approved. Per action, never per session.
+4. **Build the append-only audit log** with provenance on every tool call.
+5. **Run the confused-deputy attack** — one attack, done properly, with the forgery
+   working pre-patch and refused post-patch on the identical input. Below.
+6. **Business: the verdict, or the refusal to issue one.** Apply the five kill
    criteria to the top candidate in the pain register. Issue a verdict — or an
    explicit non-verdict naming each missing threshold and the month it could
    realistically arrive. **"Insufficient evidence, deferred to month 5" is a
    passing deliverable.** "More research needed" is not a non-verdict; it is the
    absence of one.
-9. **The twelve-week retrospective.** Below.
+7. **The twelve-week retrospective.** Below. Budget 3 hours and do not compress it
+   — it is the input to everything after week 12, and it is the one task here whose
+   value does not depend on any of the others being finished.
+
+### Stretch — only after Core is DONE
+
+- **The malicious-tool-output attack.** Below. Genuinely valuable, and a second
+  full attack in the same week as the retrospective is not realistic. If it slips,
+  run it in month 4 alongside the malformed-input work — they belong together.
+- **Architecture review #3** with the five-axis rubric, all fourteen defect
+  classes, and ≥2 accepted defects carrying remediation months. This is a 4-hour
+  job. **Do not drop it — schedule it.** Its whole value is the comparison against
+  review #1, and that comparison keeps just as well in month 4 as in week 12.
+- **Scope credentials to the task**, short-lived, with expiry. Correct, and it
+  needs a credential-issuing surface that a laptop build may not have yet.
+- **Provenance on memory writes** as well as tool calls — relevant once the memory
+  surface exists in month 5.
 
 ## Use it for real
 
@@ -87,14 +100,15 @@ make the attack land — if it needs a code change, it was not demonstrated.
 
 - Out-of-profile calls refused: 100%, each logged with the tool name.
 - Confused deputy: privileged actions triggered per forgery attempt, before and
-  after the patch.
-- Malicious tool output: hostile values reaching the instruction context, before
-  and after.
+  after the patch. This is the week's headline pair.
 - Latency added per privileged action by the re-authorization check, p50.
-- Review: all 14 classes assessed, all 5 axes scored independently, review-#1
-  findings closed over review-#1 findings recorded.
+- *(Stretch)* hostile tool-output values reaching the instruction context, before
+  and after; review-#1 findings closed over review-#1 findings recorded.
 
 ## Failure exercises
+
+The confused deputy is Core. Malicious tool output is Stretch — run it if the week
+allows, and carry it to month 4 if not.
 
 **The confused deputy.** Make a low-privilege step cause a high-privilege one to
 act, without either being compromised.
@@ -118,8 +132,8 @@ forgery unchanged.
   logged. A test asserts the re-authorization check fires ≥2 times inside a single
   multi-action task.
 
-**Malicious tool output.** Treat a tool's return value as attacker-controlled,
-because it is.
+**Malicious tool output** *(Stretch)*. Treat a tool's return value as
+attacker-controlled, because it is.
 
 Stub a tool returning two hostile shapes: content shaped like instructions, and
 content violating the tool's declared schema. Record what the current agent does
@@ -151,59 +165,53 @@ Answer these in writing. It is the most valuable two hours of the quarter.
 
 ## Deliverables
 
-- [ ] Per-tool least-privilege profiles, enforced and logged.
-- [ ] Task-scoped short-lived credentials.
+- [ ] Per-tool least-privilege profiles, enforced at the call site and logged.
 - [ ] Per-action re-authorization against the approved request.
 - [ ] Sandboxed execution surface with network egress blocked, asserted by a test.
-- [ ] Append-only audit log with provenance on every tool call and memory write.
+- [ ] Append-only audit log with provenance on every tool call.
 - [ ] Confused-deputy report: working forgery, patch, unchanged re-test.
-- [ ] Malicious-tool-output report: two hostile shapes, boundary validation, the
-      recorded post-rejection behaviour.
-- [ ] Architecture review #3 as an ADR: five-axis rubric, all 14 classes, ≥2
-      accepted defects with remediation months, every review-#1 finding accounted
-      for.
 - [ ] SaaS verdict or explicit dated non-verdict against the five kill criteria.
 - [ ] Twelve-week retrospective, all five questions, plus the rewritten months
       4–12 sequence.
+- [ ] *(Stretch, if reached)* malicious-tool-output report; architecture review #3;
+      task-scoped credentials. Anything not reached is **scheduled**, with a month
+      named — not silently dropped.
 
 ## Done when
 
-- [ ] Every tool has a named profile, and an out-of-profile call is refused and
-      appears in the audit log.
+- [ ] Every tool has a named profile, and an out-of-profile call is refused **in
+      code at the call site** and appears in the audit log.
 - [ ] Agent-executed code cannot reach the network, and a test proves it.
-- [ ] Post-patch, the identical confused-deputy forgery causes zero privileged
-      actions, and the refusal names the approved request it was compared against.
-- [ ] Zero instruction-shaped tool outputs reach the instruction context, and the
-      task dead-letters after exactly N refusals with N stated in advance.
-- [ ] All 5 review axes are scored independently, each with its own citation, and
-      ≥2 defects are recorded as accepted with named remediation months.
-- [ ] Every review-#1 finding is marked remediated, accepted or re-reported, with
-      zero dropped.
+- [ ] Pre-patch, the forgery causes ≥1 privileged action, evidenced from the audit
+      log. Post-patch, the identical input causes zero, and the refusal names the
+      approved request it was compared against.
+- [ ] Nothing in the security write-up rests on the model having declined.
 - [ ] All 5 kill criteria are evaluated or explicitly marked unevaluable with a
       reason; a non-verdict names ≥1 specific unmet threshold and a date.
-- [ ] The months 4–12 files have been edited to match what the retrospective
-      concluded.
+- [ ] The retrospective is written, and **the months 4–12 files have been edited to
+      match what it concluded.**
+- [ ] Every Stretch item not reached has a named month, in writing.
 
 ## Reflection
 
 1. The deputy was confused because it trusted its caller. Which other component in
    your build trusts its caller the same way?
-2. You accepted two defects. What would have to change — in load, in users, in who
-   runs this — for one of them to stop being acceptable?
-3. Compare review #3 with review #1. Did the platform get better, or did your
-   review get better? What evidence separates the two?
-4. If you issued a non-verdict, what would you have concluded had you forced a
+2. Which of your security controls would still hold against a model that had been
+   fine-tuned to be maximally compliant with whatever it read? The ones that would
+   not are defense in depth, and that is fine — as long as you know which is which.
+3. If you issued a non-verdict, what would you have concluded had you forced a
    score — and would that conclusion have been the one you wanted?
+4. *(If you ran review #3)* Compare it with review #1. Did the platform get better,
+   or did your review get better? What evidence separates the two?
 
 ## Evidence
 
 - Tool profiles, and audit-log entries for refused calls.
 - Sandbox egress test.
 - Confused-deputy report, with audit-log evidence from both arms.
-- Malicious-tool-output report.
-- Review #3 ADR with the five-axis rubric and accepted defects.
 - SaaS verdict or non-verdict.
-- The retrospective document.
+- The retrospective document, and the edited months 4–12 files.
+- Anything from Stretch that was reached; the scheduled month for anything not.
 
 **Hours logged:** learning ___ / building ___ / testing ___ / business ___
 
